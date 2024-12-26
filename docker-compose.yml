@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: postgres_hub
+    restart: always
+    environment:
+      POSTGRES_DB: distri_cloud
+      POSTGRES_USER: dc_dragos
+      POSTGRES_PASSWORD: 123
+    ports:
+      - "15432:5432"  # External port 15432 maps to internal PostgreSQL port 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dc_dragos -d distri_cloud"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  django:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: django_hub
+    restart: always
+    volumes:
+      - .:/app  # Mount the current project directory into the container
+    ports:
+      - "18000:8000"
+    depends_on:
+      - postgres
+    environment:
+      - POSTGRES_DB=distri_cloud
+      - POSTGRES_USER=dc_dragos
+      - POSTGRES_PASSWORD=123
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - DEBUG=True
+    command: >
+      sh -c "python manage.py runserver 0.0.0.0:8000 --noreload"
+
+  redis:
+    image: redis:6
+    container_name: redis_hub
+    ports:
+      - "16379:6379"
+    restart: always
+
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery_hub
+    command: celery -A licenta worker --loglevel=info
+    depends_on:
+      - redis
+      - django
+    environment:
+      - POSTGRES_DB=distri_cloud
+      - POSTGRES_USER=dc_dragos
+      - POSTGRES_PASSWORD=123
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - DEBUG=True
+      - DJANGO_SETTINGS_MODULE=licenta.settings
+
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery_beat
+    command: celery -A licenta beat --loglevel=info
+    depends_on:
+      - celery
+      - redis
+
+volumes:
+  postgres_data:
