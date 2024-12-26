@@ -1,7 +1,7 @@
 from celery import shared_task
 from django.utils import timezone
 from datetime import timedelta
-from models import Node
+from hub.models import Node
 
 @shared_task
 def check_node_health():
