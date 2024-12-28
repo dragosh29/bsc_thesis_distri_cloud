@@ -1,5 +1,9 @@
+# models.py
+
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
+import uuid
 
 
 class Node(models.Model):
@@ -7,13 +11,18 @@ class Node(models.Model):
     Represents a connected peer in the network. Nodes periodically
     report their resource usage so the hub can make informed scheduling decisions.
     """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     name = models.CharField(max_length=100)
     ip_address = models.GenericIPAddressField()
 
     status = models.CharField(
         max_length=20,
-        choices=[('active', 'Active'), ('inactive', 'Inactive'),
-                 ('busy', 'Busy'), ('failed', 'Failed')],
+        choices=[
+            ('active', 'Active'),
+            ('inactive', 'Inactive'),
+            ('busy', 'Busy'),
+        ],
         default='inactive'
     )
 
@@ -25,9 +34,9 @@ class Node(models.Model):
     # Resource capacity (static or semi-static info)
     resources_capacity = models.JSONField(
         default=dict
-        # Example structure: {
-        #   "cpu_cores": 4,
-        #   "ram_gb": 16,
+        # Example: {
+        #   "cpu": 4,
+        #   "ram": 16,
         #   "gpu": false
         # }
     )
@@ -35,9 +44,9 @@ class Node(models.Model):
     # Current usage (dynamic) - Node reports usage periodically
     resources_usage = models.JSONField(
         default=dict
-        # Example structure: {
-        #   "cpu_cores_in_use": 2,
-        #   "ram_gb_in_use": 8
+        # Example: {
+        #   "cpu": 2,
+        #   "ram": 8
         # }
     )
 
@@ -49,20 +58,29 @@ class Node(models.Model):
 
     def is_available_for_task(self, task_requirements: dict) -> bool:
         """
-        Example helper method:
         Check if this Node has enough free resources for `task_requirements`.
         """
-        capacity = self.resources_capacity
-        usage = self.resources_usage
-        # Very simplified logic below (pseudo-code):
-        #   free_cpu = capacity["cpu_cores"] - usage["cpu_cores_in_use"]
-        #   free_ram = capacity["ram_gb"] - usage["ram_gb_in_use"]
-        #   needed_cpu = task_requirements.get("cpu_cores", 1)
-        #   needed_ram = task_requirements.get("ram_gb", 1)
-        #   return (free_cpu >= needed_cpu) and (free_ram >= needed_ram)
+        capacity = self.resources_capacity or {}
+        usage = self.resources_usage or {}
 
-        # You'd parse and compare carefully. For now, we'll just stub it out:
-        return True
+        free_cpu = capacity.get("cpu", 0) - usage.get("cpu", 0)
+        free_ram = capacity.get("ram", 0) - usage.get("ram", 0)
+
+        needed_cpu = task_requirements.get("cpu", 1)
+        needed_ram = task_requirements.get("ram", 1)
+
+        return (free_cpu >= needed_cpu) and (free_ram >= needed_ram)
+
+    def mark_inactive_if_stale(self, threshold_seconds=60):
+        """
+        Optional helper: Mark this node as inactive if no heartbeat
+        in `threshold_seconds`.
+        """
+        time_since_heartbeat = (timezone.now() - self.last_heartbeat).total_seconds()
+        if time_since_heartbeat > threshold_seconds:
+            if self.status != 'inactive':
+                self.status = 'inactive'
+                self.save()
 
 
 class Task(models.Model):
@@ -72,24 +90,31 @@ class Task(models.Model):
     schedule properly. We also keep track of overlap_count for
     majority-based validation if needed.
     """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     description = models.TextField()
 
     status = models.CharField(
         max_length=20,
-        choices=[('pending', 'Pending'), ('in_progress', 'In Progress'),
-                 ('completed', 'Completed'), ('failed', 'Failed')],
+        choices=[
+            ('pending', 'Pending'),
+            ('in_queue', 'In Queue'),
+            ('in_progress', 'In Progress'),
+            ('completed', 'Completed'),
+            ('failed', 'Failed')
+        ],
         default='pending'
     )
 
-    # If you want ONLY one node assigned, keep a single FK:
-    assigned_node = models.ForeignKey(Node, null=True, blank=True, on_delete=models.SET_NULL)
-
-    # If you want multiple nodes to run the same task for cross-validation,
-    # you could use a ManyToMany (see "TaskAssignment" model below).
-    # But let's keep assigned_node for "primary" assignment.
+    # Many-to-many for cross-validation or multiple assignment
+    assigned_nodes = models.ManyToManyField(
+        'Node',
+        through='TaskAssignment',
+        related_name='assigned_tasks'
+    )
 
     trust_index_required = models.FloatField(
-        default=5.0,  # e.g., requires trust_index >= 5
+        default=5.0,
         validators=[MinValueValidator(0.0), MaxValueValidator(10.0)]
     )
 
@@ -98,39 +123,72 @@ class Task(models.Model):
         # e.g., {"image": "python:3.9", "command": "python main.py", "env": {...}}
     )
 
-    # Resource requirements for scheduling
     resource_requirements = models.JSONField(
         default=dict
-        # e.g., {"cpu_cores": 2, "ram_gb": 4}
+        # e.g., {"cpu": 2, "ram": 4}
     )
 
     # Overlap or majority-based validations:
-    # e.g., how many nodes to run the same task for cross-check
     overlap_count = models.PositiveSmallIntegerField(default=1)
 
+    # Capture final result or metadata:
     result = models.JSONField(null=True, blank=True)
 
+    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # Staleness logic
+    stale_count = models.PositiveIntegerField(default=0)
+    last_attempted = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Task {self.id}: {self.status}"
 
+    def mark_stale(self):
+        """
+        Increment the stale counter when a task can't be assigned or fails repeatedly.
+        """
+        self.stale_count = models.F('stale_count') + 1
+        self.save(update_fields=['stale_count'])
+        self.refresh_from_db()
+
+    def reset_stale(self):
+        """
+        Reset the stale count if/when the task is successfully assigned.
+        """
+        self.stale_count = 0
+        self.save(update_fields=['stale_count'])
+
+    def get_assigned_nodes(self):
+        """
+        Get the list of nodes assigned to this task.
+        """
+        res = ''
+        for node in self.assigned_nodes.all():
+            res = res + node.name + ' '
+        return res
+
 
 class TaskAssignment(models.Model):
     """
-    If you want multiple Nodes to run the same Task simultaneously
-    for cross-validation, you can track each assignment here.
-    - 'node' runs the task
-    - 'task' is the job to execute
-    - 'result' is what that node computed
-    - 'validated' if the node's result was accepted
+    Multiple Nodes can run the same Task simultaneously
+    for cross-validation or redundancy. This model records:
+    - Which node runs the task
+    - Timestamps for assignment and completion
+    - The node's result
+    - Whether that result was validated/accepted
     """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     node = models.ForeignKey(Node, on_delete=models.CASCADE)
     task = models.ForeignKey(Task, on_delete=models.CASCADE)
+
     result = models.JSONField(null=True, blank=True)
     validated = models.BooleanField(default=False)
+
     assigned_at = models.DateTimeField(auto_now_add=True)
+    started_at = models.DateTimeField(null=True, blank=True)   # Optional: when the node actually started
     completed_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
@@ -142,13 +200,32 @@ class Heartbeat(models.Model):
     Track health pings from Nodes. The Node can send
     additional info about resource usage or status in the future.
     """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
     node = models.ForeignKey(Node, on_delete=models.CASCADE)
     timestamp = models.DateTimeField(auto_now=True)
+
     status = models.CharField(
         max_length=20,
-        choices=[('healthy', 'Healthy'), ('unhealthy', 'Unhealthy')],
+        choices=[
+            ('healthy', 'Healthy'),
+            ('unhealthy', 'Unhealthy')
+        ],
         default='healthy'
     )
 
     def __str__(self):
         return f"Heartbeat from {self.node.name} at {self.timestamp}"
+
+    def update_node_status(self):
+        """
+        Example helper: If this heartbeat is 'healthy', mark the node 'active';
+        if 'unhealthy', mark it 'inactive'. (We do not mark nodes as 'failed'.)
+        """
+        if self.status == 'healthy' and self.node.status != 'active':
+            self.node.status = 'active'
+            self.node.save()
+        elif self.status == 'unhealthy':
+            if self.node.status != 'inactive':
+                self.node.status = 'inactive'
+                self.node.save()

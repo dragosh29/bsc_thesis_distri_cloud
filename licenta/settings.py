@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 import os
 from pathlib import Path
 
+from django.contrib import staticfiles
+
 import hub
 
 from decouple import config
@@ -136,7 +138,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 # Celery Configuration
 CELERY_BROKER_URL = 'redis://redis:6379/0'
@@ -148,4 +150,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'hub.tasks.check_node_health',
         'schedule': 60.0,  # Run every 60 seconds
     },
+    'distribute_tasks': {
+        'task': 'hub.tasks.distribute_tasks',
+        'schedule': 30.0,  # Run every 30 seconds
+    },
 }
+
+ACTIVE_QUEUE_SIZE = 10

@@ -9,8 +9,8 @@ class NodeAdmin(admin.ModelAdmin):
 
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
-    list_display = ('id', 'description', 'status', 'assigned_node',
-                    'trust_index_required', 'overlap_count', 'created_at', 'updated_at')
+    list_display = ('id', 'description', 'status',
+                    'trust_index_required', 'overlap_count', 'created_at', 'updated_at', 'get_assigned_nodes')
 
 @admin.register(TaskAssignment)
 class TaskAssignmentAdmin(admin.ModelAdmin):
