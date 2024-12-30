@@ -63,6 +63,9 @@ services:
       - POSTGRES_PORT=5432
       - DEBUG=True
       - DJANGO_SETTINGS_MODULE=licenta.settings
+    volumes:
+      - .:/app
+      - /var/run/docker.sock:/var/run/docker.sock
 
   celery-beat:
     build:

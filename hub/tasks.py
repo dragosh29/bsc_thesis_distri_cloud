@@ -1,7 +1,8 @@
-from celery import shared_task
+from datetime import timedelta
+
+from celery import shared_task, group, chain
 from django.db.models import Q
 from django.utils import timezone
-from datetime import timedelta
 
 from hub.models import Node
 from hub.task_manager import TaskManager, logger
@@ -37,14 +38,69 @@ def check_node_health():
 
 
 @shared_task
-def distribute_tasks():
-    """
-    Periodically invokes the TaskManager to manage
-    - Reordering active queue
-    - Moving tasks from backlog to active
-    - Assigning tasks to nodes
-    - Handling stale tasks
-    """
+def reorder_active_queue_task(*args, **kwargs):
     manager = TaskManager()
-    manager.manage_distributions()
-    logger.info("[distribute_tasks] Task distribution cycle complete.")
+    manager.reorder_active_queue()
+
+
+@shared_task
+def handle_stale_tasks_task(*args, **kwargs):
+    manager = TaskManager()
+    manager.handle_stale_tasks()
+
+
+@shared_task
+def move_tasks_to_active_queue_task(*args, **kwargs):
+    manager = TaskManager()
+    manager.move_tasks_to_active_queue()
+
+
+@shared_task
+def assign_tasks_to_nodes_task(*args, **kwargs):
+    manager = TaskManager()
+    manager.assign_tasks_to_nodes()
+
+
+@shared_task
+def retry_failed_tasks_task(*args, **kwargs):
+    manager = TaskManager()
+    manager.retry_failed_tasks()
+
+
+@shared_task
+def handle_persistently_failing_tasks_task(*args, **kwargs):
+    manager = TaskManager()
+    manager.handle_persistently_failing_tasks()
+
+
+@shared_task
+def validate_docker_image_task(task_id):
+    manager = TaskManager()
+    manager.validate_docker_image(task_id)
+
+
+@shared_task
+def orchestrate_task_distribution():
+    """
+    Orchestrates the task distribution workflow using Celery's `group` and `chain`.
+    """
+    # Parallel tasks
+    parallel_tasks = group(
+        reorder_active_queue_task.s(),
+        handle_stale_tasks_task.s()
+    )
+
+    # Sequential tasks
+    sequential_tasks = chain(
+        move_tasks_to_active_queue_task.s(),
+        assign_tasks_to_nodes_task.s(),
+        retry_failed_tasks_task.s(),
+        handle_persistently_failing_tasks_task.s()
+    )
+
+    # Orchestration workflow
+    workflow = chain(parallel_tasks, sequential_tasks)
+
+    # Execute asynchronously
+    workflow.apply_async()
+    logger.info("[orchestrate_task_distribution] Task distribution workflow initiated.")

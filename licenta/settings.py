@@ -144,16 +144,28 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_CACHE_BACKEND = 'django-cache'
+CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+CELERY_RESULT_EXPIRES = 3600  # Results will expire after 1 hour
 CELERY_TIMEZONE = 'UTC'
 CELERY_BEAT_SCHEDULE = {
     'check_node_health': {
         'task': 'hub.tasks.check_node_health',
         'schedule': 60.0,  # Run every 60 seconds
     },
-    'distribute_tasks': {
-        'task': 'hub.tasks.distribute_tasks',
-        'schedule': 30.0,  # Run every 30 seconds
+    'orchestrate_task_distribution': {
+        'task': 'hub.tasks.orchestrate_task_distribution',
+        'schedule': 120.0,  # Run every 30 seconds
     },
 }
 
 ACTIVE_QUEUE_SIZE = 10
+VALIDATION_THRESHOLD = 0.6
+TRUST_INCREMENT = 0.1
+TRUST_DECREMENT = 0.2
+STALE_PENALTY_MULTIPLIER = 10
+IN_PROGRESS_BOOST = 1.2
+MAX_STALE_COUNT = 50
+TRUST_INDEX_MIN = 1.0
+TRUST_INDEX_MAX = 10.0

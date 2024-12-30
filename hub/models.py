@@ -26,9 +26,9 @@ class Node(models.Model):
         default='inactive'
     )
 
-    trust_index = models.PositiveSmallIntegerField(
-        default=5,
-        validators=[MinValueValidator(0), MaxValueValidator(10)]
+    trust_index = models.FloatField(
+        default=5.0,
+        validators=[MinValueValidator(0.0), MaxValueValidator(10.0)]
     )  # 0 (untrusted) to 10 (fully trusted)
 
     # Resource capacity (static or semi-static info)
@@ -101,7 +101,9 @@ class Task(models.Model):
             ('in_queue', 'In Queue'),
             ('in_progress', 'In Progress'),
             ('completed', 'Completed'),
-            ('failed', 'Failed')
+            ('failed', 'Failed'),
+            ('validating', 'Validating'),
+            ('invalid', 'Invalid')
         ],
         default='pending'
     )

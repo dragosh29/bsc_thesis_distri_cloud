@@ -1,10 +1,16 @@
 # task_manager.py
 
 import logging
+import docker
+from docker.errors import ImageNotFound, APIError, DockerException
+from collections import defaultdict
+
 from django.utils import timezone
 from django.conf import settings
 from django.db.models import Q, Count
 from hub.models import Task, Node, TaskAssignment
+from licenta.settings import VALIDATION_THRESHOLD, TRUST_INCREMENT, TRUST_DECREMENT, STALE_PENALTY_MULTIPLIER, \
+    IN_PROGRESS_BOOST, MAX_STALE_COUNT, TRUST_INDEX_MAX, TRUST_INDEX_MIN
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +27,7 @@ class TaskManager:
         # The maximum number of tasks to keep 'in_progress' at once
         self.active_queue_size = getattr(settings, 'ACTIVE_QUEUE_SIZE', 10)
         # Stale tasks threshold
-        self.max_stale_count = 20
+        self.max_stale_count = MAX_STALE_COUNT
 
     def calculate_task_priority(self, task: Task) -> float:
         """
@@ -34,10 +40,10 @@ class TaskManager:
         resource_weight = task.resource_requirements.get("cpu_cores", 0.5) + task.resource_requirements.get("ram_gb",
                                                                                                             0.5)
         # Give a penalty for tasks that have gone stale multiple times
-        stale_penalty = task.stale_count * 10
+        stale_penalty = task.stale_count * STALE_PENALTY_MULTIPLIER
 
         # Status weight: in_progress tasks get a slight boost
-        status_weight = 1.2 if task.status == 'in_progress' else 1.0
+        status_weight = IN_PROGRESS_BOOST if task.status == 'in_progress' else 1.0
 
         # Basic formula with status weight
         return ((time_waiting / resource_weight) - stale_penalty) * status_weight
@@ -177,20 +183,6 @@ class TaskManager:
             task.save()
             logger.info(f"Marked task {task.id} as failed due to exceeding stale threshold.")
 
-    def manage_distributions(self):
-        """
-        Orchestrates the scheduling:
-          1. Reorder the active queue if needed.
-          2. Move tasks from backlog to active queue.
-          3. Assign tasks to nodes.
-          4. Handle stale tasks.
-        """
-        logger.info("Starting task distribution cycle...")
-        self.reorder_active_queue()
-        self.move_tasks_to_active_queue()
-        self.assign_tasks_to_nodes()
-        self.handle_stale_tasks()
-        logger.info("Completed task distribution cycle.")
 
     def handle_tasks_for_inactive_nodes(self, inactive_node_ids):
         """
@@ -229,3 +221,166 @@ class TaskManager:
         if in_progress_count:
             logger.info(
              f"[handle_tasks_for_inactive_nodes] {in_progress_count} task(s) updated to 'in_progress' (active assignments remain).")
+
+    def validate_task(self, task_id):
+        """
+        Validates task results using trust-weighted majority voting and adjusts node trust indexes.
+        """
+        try:
+            task = Task.objects.get(id=task_id)
+        except Task.DoesNotExist:
+            logger.error(f"[VALIDATION] Task {task_id} does not exist.")
+            return False
+
+        if task.status != 'completed':
+            logger.warning(f"[VALIDATION] Task {task_id} is not completed yet.")
+            return False
+
+        # Aggregate results from task assignments
+        assignments = TaskAssignment.objects.filter(task=task, completed_at__isnull=False)
+        result_weights = defaultdict(float)
+        node_results = {}
+
+        for assignment in assignments:
+            node = assignment.node
+            result = assignment.result.get('output') if assignment.result else None
+            if result:
+                result_weights[result] += node.trust_index
+                node_results[node.id] = result
+
+        if not result_weights:
+            logger.warning(f"[VALIDATION] No valid results found for Task {task_id}.")
+            task.status = 'failed'
+            task.save()
+            return False
+
+        # Find the result with the maximum trust weight
+        validated_result, max_weight = max(result_weights.items(), key=lambda x: x[1])
+        total_weight = sum(result_weights.values())
+
+        # Determine if the result passes the validation threshold
+        validation_threshold = VALIDATION_THRESHOLD  # 60% trust weight threshold
+        if max_weight / total_weight >= validation_threshold:
+            task.result = {"validated_output": validated_result, "trust_score": max_weight}
+            task.status = 'validated'
+            task.save()
+            logger.info(f"[VALIDATION] Task {task_id} validated successfully with result: {validated_result}")
+
+            # Adjust trust indexes based on validation
+            for assignment in assignments:
+                node = assignment.node
+                if node_results.get(node.id) == validated_result:
+                    node.trust_index = min(node.trust_index + TRUST_INCREMENT, TRUST_INDEX_MAX)  # Cap at 10.0
+                    logger.info(f"[TRUST] Node {node.name} trust index increased to {node.trust_index}")
+                else:
+                    node.trust_index = max(node.trust_index - TRUST_DECREMENT, TRUST_INDEX_MIN)  # Floor at 1.0
+                    logger.info(f"[TRUST] Node {node.name} trust index decreased to {node.trust_index}")
+                node.save()
+
+            return True
+        else:
+            task.status = 'failed'
+            task.save()
+            logger.warning(f"[VALIDATION] Task {task_id} failed validation. Insufficient trust weight.")
+
+            # Adjust trust indexes negatively for all nodes involved
+            for assignment in assignments:
+                node = assignment.node
+                node.trust_index = max(node.trust_index - TRUST_DECREMENT, TRUST_INDEX_MIN)  # Floor at 1.0
+                node.save()
+                logger.warning(f"[TRUST] Node {node.name} trust index decreased to {node.trust_index}")
+
+            return False
+
+    def retry_failed_tasks(self):
+        """
+        Retry tasks marked as 'failed' by resetting their status and stale counters,
+        allowing them to be redistributed.
+        """
+        # Fetch tasks that are marked as 'failed' and haven't exceeded retry limits
+        retryable_tasks = Task.objects.filter(
+            status='failed',
+            stale_count__lt=self.max_stale_count  # Ensure we don't retry tasks indefinitely
+        )
+
+        if not retryable_tasks.exists():
+            logger.info("[retry_failed_tasks] No retryable failed tasks found.")
+            return
+
+        retried_count = 0
+        for task in retryable_tasks:
+            task.status = 'pending'
+            task.stale_count = 0  # Reset the stale counter
+            task.last_attempted = timezone.now()
+            task.save()
+            retried_count += 1
+            logger.info(f"[retry_failed_tasks] Task {task.id} reset and moved back to 'pending'.")
+
+        logger.info(f"[retry_failed_tasks] {retried_count} failed tasks were reset for retry.")
+
+    def handle_persistently_failing_tasks(self):
+        """
+        Delete tasks that have exceeded the maximum retry threshold.
+        """
+        persistently_failing_tasks = Task.objects.filter(
+            stale_count__gte=self.max_stale_count,
+            status='failed'
+        )
+
+        if not persistently_failing_tasks.exists():
+            logger.info("[handle_persistently_failing_tasks] No tasks exceeded max retry limit.")
+            return
+
+        task_ids = [str(task.id) for task in persistently_failing_tasks]
+        deleted_count, _ = persistently_failing_tasks.delete()
+
+        logger.warning(
+            f"[handle_persistently_failing_tasks] Deleted {deleted_count} persistently failing task(s): {', '.join(task_ids)}"
+        )
+
+    def validate_docker_image(self, task_id):
+        """
+        Validate Docker image before allowing the task to proceed.
+        """
+        try:
+            task = Task.objects.get(id=task_id)
+        except Task.DoesNotExist:
+            return {"status": "invalid", "error": f"Task {task_id} does not exist."}
+
+        image = task.container_spec.get('image')
+        credentials = task.container_spec.get('docker_credentials', {})
+
+        try:
+            client = docker.DockerClient(base_url='unix://var/run/docker.sock')
+            # Handle private registry login
+            if credentials:
+                client.login(
+                    username=credentials.get('username'),
+                    password=credentials.get('password'),
+                    registry=credentials.get('registry', 'https://index.docker.io/v1/')
+                )
+
+            # Try pulling the image
+            client.images.pull(image)
+            task.status = 'pending'
+            task.save()
+            return {"status": "valid"}
+        except docker.errors.APIError as e:
+            task.status = 'invalid'
+            task.save()
+            return {"status": "invalid", "error": f"API Error: {str(e)}"}
+        except docker.errors.ImageNotFound:
+            task.status = 'invalid'
+            task.save()
+            return {"status": "invalid", "error": f"Image '{image}' not found."}
+        except DockerException as e:
+            task.status = 'invalid'
+            task.save()
+            return {"status": "invalid", "error": f"Docker exception: {str(e)}"}
+        except Exception as e:
+            task.status = 'invalid'
+            task.save()
+            return {"status": "invalid", "error": f"Unexpected error: {str(e)}"}
+        finally:
+            if credentials:
+                client.logout()

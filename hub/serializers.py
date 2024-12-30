@@ -10,3 +10,37 @@ class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = '__all__'
+
+class TaskSubmissionSerializer(serializers.Serializer):
+    """
+    Serializer for task submission via API.
+    """
+    description = serializers.CharField(max_length=255, required=True)
+    container_spec = serializers.JSONField(required=True)
+    resource_requirements = serializers.JSONField(required=True)
+    trust_index_required = serializers.FloatField(
+        required=False, default=5.0,
+        min_value=0.0, max_value=10.0
+    )
+    overlap_count = serializers.IntegerField(
+        required=False, default=1,
+        min_value=1
+    )
+
+    def validate_container_spec(self, value):
+        """
+        Ensure container_spec contains at least an 'image' field and a command field.
+        """
+        if 'image' not in value:
+            raise serializers.ValidationError("Container spec must include an 'image' field.")
+        if 'command' not in value:
+            raise serializers.ValidationError("Container spec must include a 'command' field.")
+        return value
+
+    def validate_resource_requirements(self, value):
+        """
+        Ensure resource requirements contain 'cpu' and 'ram'.
+        """
+        if 'cpu' not in value or 'ram' not in value:
+            raise serializers.ValidationError("Resource requirements must include 'cpu' and 'ram'.")
+        return value

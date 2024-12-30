@@ -1,10 +1,12 @@
 # views.py
 
 from django.utils import timezone
+from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from hub.models import Node, Task, TaskAssignment
-from hub.serializers import NodeSerializer, TaskSerializer
+from hub.serializers import NodeSerializer, TaskSerializer, TaskSubmissionSerializer
+from hub.tasks import validate_docker_image_task
 
 
 @api_view(['POST'])
@@ -15,8 +17,8 @@ def register_node(request):
     serializer = NodeSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
-        return Response(serializer.data, status=201)
-    return Response(serializer.errors, status=400)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
@@ -31,12 +33,12 @@ def fetch_task(request):
     """
     node_id = request.query_params.get('node_id')
     if not node_id:
-        return Response({"error": "Missing node_id parameter."}, status=400)
+        return Response({"error": "Missing node_id parameter."}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         node = Node.objects.get(id=node_id)
     except Node.DoesNotExist:
-        return Response({"error": "Node not found."}, status=404)
+        return Response({"error": "Node not found."}, status=status.HTTP_404_NOT_FOUND)
 
     # Find the earliest assignment that isn't completed
     assignment = TaskAssignment.objects.filter(
@@ -45,7 +47,7 @@ def fetch_task(request):
     ).order_by('assigned_at').first()
 
     if not assignment:
-        return Response({"message": "No assigned tasks available."}, status=404)
+        return Response({"message": "No assigned tasks available."}, status=status.HTTP_404_NOT_FOUND)
 
     # If you want to mark that the task started:
     assignment.started_at = timezone.now()
@@ -53,7 +55,7 @@ def fetch_task(request):
 
     # Return the full Task to the node
     task_data = TaskSerializer(assignment.task).data
-    return Response(task_data, status=200)
+    return Response(task_data, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -66,39 +68,37 @@ def submit_task_result(request):
     node_id = request.data.get('node_id')
     result = request.data.get('result')
 
-    if not (task_id and node_id and (result is not None)):
-        return Response({"error": "task_id, node_id, and result are required fields."}, status=400)
+    if not (task_id and node_id and result):
+        return Response({"error": "task_id, node_id, and result are required fields."}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        task = Task.objects.get(id=task_id)
-    except Task.DoesNotExist:
-        return Response({"error": "Task not found."}, status=404)
-
-    try:
-        assignment = TaskAssignment.objects.get(task=task, node_id=node_id)
+        assignment = TaskAssignment.objects.get(task_id=task_id, node_id=node_id)
     except TaskAssignment.DoesNotExist:
-        return Response({"error": "TaskAssignment not found for the given node."}, status=404)
+        return Response({"error": "TaskAssignment not found for the given node."}, status=status.HTTP_404_NOT_FOUND)
 
-    # If already completed, no multiple submissions
     if assignment.completed_at:
-        return Response({"error": "This TaskAssignment result was already submitted."}, status=400)
+        return Response({"error": "This TaskAssignment result was already submitted."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Record the result
+    # Save result
     assignment.result = result
-    assignment.validated = False  # Implement validation logic if needed
     assignment.completed_at = timezone.now()
     assignment.save()
 
-    # Check if all assignments for this task are done
-    total_assignments = TaskAssignment.objects.filter(task=task).count()
-    completed_assignments = TaskAssignment.objects.filter(task=task, completed_at__isnull=False).count()
+    # Check if all assignments are completed
+    total_assignments = TaskAssignment.objects.filter(task_id=task_id).count()
+    completed_assignments = TaskAssignment.objects.filter(task_id=task_id, completed_at__isnull=False).count()
 
-    # If all assigned nodes have completed, mark the Task as completed
     if completed_assignments == total_assignments:
-        task.status = 'completed'
-        task.save()
+        assignment.task.status = 'completed'
+        assignment.task.save()
 
-    return Response({"message": "Task result submitted successfully."}, status=200)
+        # Trigger Validation
+        from hub.task_manager import TaskManager
+        manager = TaskManager()
+        manager.validate_task(task_id)
+
+    print(f"[SUBMIT TASK RESULT] Task {task_id} result: {result}")
+    return Response({"message": "Task result submitted successfully."}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
@@ -111,12 +111,12 @@ def node_heartbeat(request):
     resources_usage = request.data.get('resources_usage', {})
 
     if not node_id:
-        return Response({"error": "node_id is required."}, status=400)
+        return Response({"error": "node_id is required."}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
         node = Node.objects.get(id=node_id)
     except Node.DoesNotExist:
-        return Response({"error": "Node not found."}, status=404)
+        return Response({"error": "Node not found."}, status=status.HTTP_404_NOT_FOUND)
 
     node.last_heartbeat = timezone.now()
     if isinstance(resources_usage, dict):
@@ -128,4 +128,34 @@ def node_heartbeat(request):
         node.status = 'active'
 
     node.save()
-    return Response({"message": "Heartbeat received successfully."}, status=200)
+    return Response({"message": "Heartbeat received successfully."}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+def submit_task(request):
+    """
+    Submit a task and queue it for Docker image validation.
+    """
+    description = request.data.get('description')
+    container_spec = request.data.get('container_spec', {})
+    resource_requirements = request.data.get('resource_requirements', {})
+    trust_index_required = request.data.get('trust_index_required', 5.0)
+    overlap_count = request.data.get('overlap_count', 1)
+
+    if not (description and container_spec.get('image') and container_spec.get('command')):
+        return Response({"error": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Create a task in 'validating' state
+    task = Task.objects.create(
+        description=description,
+        container_spec=container_spec,
+        resource_requirements=resource_requirements,
+        trust_index_required=trust_index_required,
+        overlap_count=overlap_count,
+        status='validating'
+    )
+
+    # Trigger Docker image validation
+    validate_docker_image_task.apply_async(args=[str(task.id)])
+
+    return Response({"message": "Task submitted and queued for validation", "task_id": str(task.id)}, status=status.HTTP_201_CREATED)
