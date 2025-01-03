@@ -132,8 +132,8 @@ class TaskManager:
 
             # Calculate suitability score for each node
             def calculate_suitability(node):
-                node_free_cpu = node.resources_capacity.get('cpu', 0) - node.resources_usage.get('cpu', 0)
-                node_free_ram = node.resources_capacity.get('ram', 0) - node.resources_usage.get('ram', 0)
+                node_free_cpu = node.free_resources.get('cpu', 0)
+                node_free_ram = node.free_resources.get('ram', 0)
 
                 task_cpu = task.resource_requirements.get('cpu', 1)
                 task_ram = task.resource_requirements.get('ram', 1)

@@ -9,6 +9,24 @@ from hub.serializers import NodeSerializer, TaskSerializer, TaskSubmissionSerial
 from hub.tasks import validate_docker_image_task
 
 
+@api_view(['GET'])
+def list_nodes(request):
+    """
+    List all nodes in the system.
+    """
+    nodes = Node.objects.all()
+    serializer = NodeSerializer(nodes, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+def list_tasks(request):
+    """
+    List all tasks in the system.
+    """
+    tasks = Task.objects.all()
+    serializer = TaskSerializer(tasks, many=True)
+    return Response(serializer.data)
+
 @api_view(['POST'])
 def register_node(request):
     """
@@ -104,11 +122,11 @@ def submit_task_result(request):
 @api_view(['POST'])
 def node_heartbeat(request):
     """
-    Endpoint for nodes to send periodic heartbeats and resource usage updates.
+    Endpoint for nodes to send periodic heartbeats and resource availability updates.
     We do not mark nodes as failed; only tasks can fail.
     """
     node_id = request.data.get('node_id')
-    resources_usage = request.data.get('resources_usage', {})
+    free_resources = request.data.get('free_resources')
 
     if not node_id:
         return Response({"error": "node_id is required."}, status=status.HTTP_400_BAD_REQUEST)
@@ -119,8 +137,8 @@ def node_heartbeat(request):
         return Response({"error": "Node not found."}, status=status.HTTP_404_NOT_FOUND)
 
     node.last_heartbeat = timezone.now()
-    if isinstance(resources_usage, dict):
-        node.resources_usage = resources_usage
+    if isinstance(free_resources, dict):
+        node.free_resources = free_resources
 
     # Set the node status to active if it isn't already busy or something else
     # Adjust this logic according to your needs:

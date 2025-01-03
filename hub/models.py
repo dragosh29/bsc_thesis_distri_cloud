@@ -42,7 +42,7 @@ class Node(models.Model):
     )
 
     # Current usage (dynamic) - Node reports usage periodically
-    resources_usage = models.JSONField(
+    free_resources = models.JSONField(
         default=dict
         # Example: {
         #   "cpu": 2,
@@ -60,11 +60,9 @@ class Node(models.Model):
         """
         Check if this Node has enough free resources for `task_requirements`.
         """
-        capacity = self.resources_capacity or {}
-        usage = self.resources_usage or {}
-
-        free_cpu = capacity.get("cpu", 0) - usage.get("cpu", 0)
-        free_ram = capacity.get("ram", 0) - usage.get("ram", 0)
+        free = self.free_resources or {}
+        free_cpu = free.get("cpu", 0)
+        free_ram = free.get("ram", 0)
 
         needed_cpu = task_requirements.get("cpu", 1)
         needed_ram = task_requirements.get("ram", 1)

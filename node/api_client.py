@@ -1,7 +1,8 @@
 # api_client.py
 
 import requests
-from config import HUB_API_BASE_URL, NODE_NAME, RESOURCE_CAPACITY, IP_ADDRESS
+from config import HUB_API_BASE_URL, NODE_NAME, IP_ADDRESS
+from utils import get_node_resources, get_node_availability
 
 class APIClient:
     node_id = None
@@ -10,9 +11,12 @@ class APIClient:
         self.base_url = HUB_API_BASE_URL
 
     def register_node(self):
+        resources = get_node_resources()
+        free_resources = get_node_availability()
         payload = {
             "name": NODE_NAME,
-            "resources_capacity": RESOURCE_CAPACITY,
+            "resource_capacity": resources,
+            "free_resources": free_resources,
             'ip_address': IP_ADDRESS
         }
         response = requests.post(f"{self.base_url}/nodes/register/", json=payload)
@@ -25,7 +29,8 @@ class APIClient:
         return response.json()
 
     def send_heartbeat(self):
-        payload = {"node_id": APIClient.node_id}
+        resources = get_node_availability()
+        payload = {"node_id": APIClient.node_id, "free_resources": resources}
         response = requests.post(f"{self.base_url}/nodes/heartbeat/", json=payload)
         return response.json()
 
