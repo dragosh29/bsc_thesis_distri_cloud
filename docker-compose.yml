@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # HUB SERVICES
+  postgres:
+    image: postgres:15
+    container_name: postgres_hub
+    restart: always
+    environment:
+      POSTGRES_DB: distri_cloud
+      POSTGRES_USER: dc_dragos
+      POSTGRES_PASSWORD: 123
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:6
+    container_name: redis_hub
+    ports:
+      - "16379:6379"
+    restart: always
+
+  hub:
+    build:
+      context: ./hub
+      dockerfile: Dockerfile
+    container_name: django_hub
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - POSTGRES_DB=distri_cloud
+      - POSTGRES_USER=dc_dragos
+      - POSTGRES_PASSWORD=123
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - DEBUG=True
+    # Volume mount: maps your host's ./hub to /app in the container
+    volumes:
+      - ./hub:/app
+    ports:
+      - "18000:8000"
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  celery:
+    build:
+      context: ./hub
+      dockerfile: Dockerfile
+    container_name: celery_hub
+    command: celery -A licenta worker --loglevel=info
+    depends_on:
+      - hub
+      - redis
+    environment:
+      - POSTGRES_DB=distri_cloud
+      - POSTGRES_USER=dc_dragos
+      - POSTGRES_PASSWORD=123
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - DEBUG=True
+    # Volume mount same folder for Celery code
+    volumes:
+      - ./hub:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  celery-beat:
+    build:
+      context: ./hub
+      dockerfile: Dockerfile
+    container_name: celery_beat
+    command: celery -A licenta beat --loglevel=info
+    depends_on:
+      - celery
+      - redis
+    # Volume mount so it sees the same Django / Celery code
+    volumes:
+      - ./hub:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # NODE SERVICES
+  frontend:
+    build:
+      context: ./node/frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "8080:80"
+    restart: always
+    environment:
+      - VITE_API_BASE_URL=http://hub:8000/api
+      - VITE_LOCAL_API_BASE_URL=http://node:18001/api
+      - VITE_APP_TITLE=DistriCloud
+      - VITE_ENABLE_DEBUG=true
+    # Volume mount for immediate changes in frontend code
+    volumes:
+      - ./node/frontend:/app
+
+  node:
+    build:
+      context: ./node/node
+      dockerfile: Dockerfile
+    container_name: node_api
+    ports:
+      - "18001:18001"
+    restart: always
+    environment:
+      - NODE_ENV=development
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    # Mount code + Docker socket (if your node service needs to manage containers)
+    volumes:
+      - ./node/node:/app
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: python node_local_server.py
+
+volumes:
+  postgres_data:
