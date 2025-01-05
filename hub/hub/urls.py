@@ -1,5 +1,5 @@
 from django.urls import path
-from hub import views
+import hub.views
 
 urlpatterns = [
     path('nodes/register/', views.register_node, name='register_node'),

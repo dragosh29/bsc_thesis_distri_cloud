@@ -1,5 +1,3 @@
-# node_manager.py
-
 import time
 from api_client import APIClient
 from task_executor import TaskExecutor
@@ -10,15 +8,22 @@ class NodeManager:
         self.api_client = APIClient()
         self.executor = TaskExecutor()
         self.heartbeat = Heartbeat()
+        self.node_id = self.api_client.node_id
 
     def start(self):
-        print("[NODE MANAGER] Starting Node...")
-        try:
-            self.api_client.register_node()
-            print("[NODE MANAGER] Node registered with the hub.")
-        except Exception as e:
-            print("[ERROR] Node registration failed:", e)
-            return
+        """
+        Start the Node Manager with node registration or resumption.
+        """
+        if self.node_id:
+            print("[NODE MANAGER] Starting as an existing node...")
+        else:
+            print("[NODE MANAGER] Registering node with the hub...")
+            try:
+                response = self.api_client.register_node()
+                self.node_id = response.get('id')
+            except Exception as e:
+                print("[ERROR] Node registration failed:", e)
+                return
 
         # Start Heartbeat in a separate thread
         import threading
