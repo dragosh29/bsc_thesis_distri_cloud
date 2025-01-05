@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "8080:80"
+    restart: always
+    environment:
+      - VITE_API_BASE_URL=http://hub:18000/api
+      - VITE_LOCAL_API_BASE_URL=http://node:18001/api
+      - VITE_APP_TITLE=DistriCloud
+      - VITE_ENABLE_DEBUG=true
+
+  node:
+    build:
+      context: ./node
+      dockerfile: Dockerfile
+    container_name: node_api
+    ports:
+      - "18001:18001"
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: python node_local_server.py
