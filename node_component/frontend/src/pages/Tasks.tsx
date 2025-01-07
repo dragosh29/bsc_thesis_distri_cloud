@@ -5,7 +5,7 @@ const Tasks: React.FC = () => {
   const [tasks, setTasks] = useState([]);
 
   useEffect(() => {
-    apiClient.get('/tasks/list')
+    apiClient.get('/tasks')
       .then(response => setTasks(response.data))
       .catch(error => console.error('Error fetching tasks:', error));
   }, []);

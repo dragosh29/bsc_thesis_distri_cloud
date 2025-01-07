@@ -42,16 +42,30 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'hub',
     'rest_framework',
+    'corsheaders',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+# Allow all origins during development
+# CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:18080",
+    "http://127.0.0.1:18080"
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:18080"
 ]
 
 ROOT_URLCONF = 'licenta.urls'

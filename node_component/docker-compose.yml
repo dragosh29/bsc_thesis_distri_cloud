@@ -1,17 +1,16 @@
-version: '3.8'
-
 services:
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: dev
     container_name: frontend
     ports:
-      - "8080:80"
+      - "18080:5173"
     restart: always
     environment:
-      - VITE_API_BASE_URL=http://hub:18000/api
-      - VITE_LOCAL_API_BASE_URL=http://node:18001/api
+      - VITE_API_BASE_URL=http://localhost:18000/api
+      - VITE_LOCAL_API_BASE_URL=http://localhost:18001/api
       - VITE_APP_TITLE=DistriCloud
       - VITE_ENABLE_DEBUG=true
 

@@ -1,5 +1,5 @@
 import requests
-from config import HUB_API_BASE_URL, NODE_NAME, IP_ADDRESS, get_node_id, save_node_id
+from config import HUB_API_BASE_URL, IP_ADDRESS, get_node_id, save_node_id
 from utils import get_node_resources, get_node_availability
 
 class APIClient:
@@ -7,7 +7,7 @@ class APIClient:
         self.base_url = HUB_API_BASE_URL
         self.node_id = get_node_id()
 
-    def register_node(self):
+    def register_node(self, node_name):
         """
         Register the node if no node_id exists.
         """
@@ -18,7 +18,7 @@ class APIClient:
         resources = get_node_resources()
         free_resources = get_node_availability()
         payload = {
-            "name": NODE_NAME,
+            "name": node_name,
             "resource_capacity": resources,
             "free_resources": free_resources,
             'ip_address': IP_ADDRESS

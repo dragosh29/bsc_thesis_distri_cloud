@@ -8,3 +8,4 @@ watchgod
 celery>=5.3.4
 redis>=5.0.0
 docker
+django-cors-headers

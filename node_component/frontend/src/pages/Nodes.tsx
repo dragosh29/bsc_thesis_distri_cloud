@@ -5,7 +5,7 @@ const Nodes: React.FC = () => {
   const [nodes, setNodes] = useState([]);
 
   useEffect(() => {
-    apiClient.get('/nodes/list')
+    apiClient.get('/nodes')
       .then(response => setNodes(response.data))
       .catch(error => console.error('Error fetching nodes:', error));
   }, []);

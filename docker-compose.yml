@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # HUB SERVICES
   postgres:
@@ -24,7 +22,7 @@ services:
 
   hub:
     build:
-      context: ./hub
+      context: ./hub_component
       dockerfile: Dockerfile
     container_name: django_hub
     restart: always
@@ -38,9 +36,9 @@ services:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - DEBUG=True
-    # Volume mount: maps your host's ./hub to /app in the container
+    # Volume mount: maps your host's ./hub_component to /app in the container
     volumes:
-      - ./hub:/app
+      - ./hub_component:/app
     ports:
       - "18000:8000"
     command: >
@@ -49,7 +47,7 @@ services:
 
   celery:
     build:
-      context: ./hub
+      context: ./hub_component
       dockerfile: Dockerfile
     container_name: celery_hub
     command: celery -A licenta worker --loglevel=info
@@ -65,12 +63,12 @@ services:
       - DEBUG=True
     # Volume mount same folder for Celery code
     volumes:
-      - ./hub:/app
+      - ./hub_component:/app
       - /var/run/docker.sock:/var/run/docker.sock
 
   celery-beat:
     build:
-      context: ./hub
+      context: ./hub_component
       dockerfile: Dockerfile
     container_name: celery_beat
     command: celery -A licenta beat --loglevel=info
@@ -79,30 +77,31 @@ services:
       - redis
     # Volume mount so it sees the same Django / Celery code
     volumes:
-      - ./hub:/app
+      - ./hub_component:/app
       - /var/run/docker.sock:/var/run/docker.sock
 
   # NODE SERVICES
   frontend:
     build:
-      context: ./node/frontend
+      context: ./node_component/frontend
+      target: dev
       dockerfile: Dockerfile
     container_name: frontend
     ports:
-      - "8080:80"
+      - "18080:5173"
     restart: always
     environment:
-      - VITE_API_BASE_URL=http://hub:8000/api
-      - VITE_LOCAL_API_BASE_URL=http://node:18001/api
+      - VITE_API_BASE_URL=http://localhost:18000/api
+      - VITE_LOCAL_API_BASE_URL=http://localhost:18001/api
       - VITE_APP_TITLE=DistriCloud
       - VITE_ENABLE_DEBUG=true
     # Volume mount for immediate changes in frontend code
     volumes:
-      - ./node/frontend:/app
+      - ./node_component/frontend:/app
 
   node:
     build:
-      context: ./node/node
+      context: ./node_component/node
       dockerfile: Dockerfile
     container_name: node_api
     ports:
@@ -113,7 +112,7 @@ services:
       - DOCKER_HOST=unix:///var/run/docker.sock
     # Mount code + Docker socket (if your node service needs to manage containers)
     volumes:
-      - ./node/node:/app
+      - ./node_component/node:/app
       - /var/run/docker.sock:/var/run/docker.sock
     command: python node_local_server.py
 
