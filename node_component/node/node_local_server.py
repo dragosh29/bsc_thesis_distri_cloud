@@ -1,9 +1,9 @@
 import json
+import logging
+import os
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import os
 from node_manager import NodeManager
-import logging
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -17,14 +17,11 @@ CORS(app, resources={r"/api/*": {"origins": "http://localhost:18080"}})
 CONFIG_FILE = "node_config.json"
 node_manager = NodeManager()
 
-
 @app.route('/api/node', methods=['GET'])
 def get_node_status():
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, 'r') as f:
             config = json.load(f)
-
-        # ✅ Refresh values from disk to memory (optional but cleaner)
         node_manager.node_id = config.get("node_id")
         node_manager.last_task_id = config.get("last_task_id")
 
@@ -42,7 +39,6 @@ def get_node_status():
         "node_id": node_manager.node_id
     }), 200
 
-
 @app.route('/api/node/register', methods=['POST'])
 def register_node():
     data = request.json
@@ -54,14 +50,10 @@ def register_node():
     try:
         success = node_manager.register(node_name)
         if success:
-            node_id = node_manager.node_id
-            return jsonify({"message": "Node registered successfully.", "id": node_id}), 200
-        else:
-            logging.error(success)
-            return jsonify({"error": "Failed to register node."}), 500
+            return jsonify({"message": "Node registered successfully.", "id": node_manager.node_id}), 200
+        return jsonify({"error": "Failed to register node."}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 @app.route('/api/node/start', methods=['POST'])
 def start_node():
@@ -71,7 +63,6 @@ def start_node():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
 @app.route('/api/node/stop', methods=['POST'])
 def stop_node():
     try:
@@ -79,7 +70,6 @@ def stop_node():
         return jsonify({"message": "Node Manager stopped successfully."}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=18001)

@@ -1,4 +1,3 @@
-// services/clients.ts
 import axios from 'axios';
 
 export const localApiClient = axios.create({
@@ -6,7 +5,7 @@ export const localApiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 5000,
+  timeout: 15000,
 });
 
 export const hubApiClient = axios.create({

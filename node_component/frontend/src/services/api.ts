@@ -1,4 +1,3 @@
-// services/api.ts
 import { FullNode, NodeConfig, TaskAssignment } from '../types/api';
 import { localApiClient, hubApiClient } from './clients';
 
@@ -38,4 +37,8 @@ export async function registerNode(name: string): Promise<void> {
 
 export async function startNode(): Promise<void> {
   await localApiClient.post('/node/start');
+}
+
+export async function stopNode(): Promise<void> {
+  await localApiClient.post('/node/stop');
 }

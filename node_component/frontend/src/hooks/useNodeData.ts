@@ -1,4 +1,3 @@
-// hooks/useNodeData.ts
 import { useEffect, useReducer, useState, useRef } from 'react';
 import {
   fetchFullNode,
@@ -6,10 +5,9 @@ import {
   fetchNodeConfig,
   registerNode,
   startNode,
+  stopNode,
 } from '../services/api';
 import { FullNode, NodeConfig, TaskAssignment } from '../types/api';
-
-
 
 interface State {
   nodeConfig: NodeConfig | null;
@@ -59,8 +57,10 @@ export function useNodeData() {
     nodeConfig: null,
     fullNode: null,
   });
+
   const [isRegistering, setIsRegistering] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   const lastTaskIdRef = useRef<string | null>(null);
 
   const fetchLastTaskDetails = async (taskId: string, nodeId: string) => {
@@ -99,6 +99,13 @@ export function useNodeData() {
     setIsStarting(false);
   };
 
+  const handleStopNode = async () => {
+    setIsStopping(true);
+    await stopNode();
+    await fetchNodeStatus();
+    setIsStopping(false);
+  };
+
   useEffect(() => {
     fetchNodeStatus();
     const interval = setInterval(fetchNodeStatus, 15000);
@@ -110,7 +117,9 @@ export function useNodeData() {
     fullNode: state.fullNode,
     isRegistering,
     isStarting,
+    isStopping,
     handleRegisterNode,
     handleStartNode,
+    handleStopNode,
   };
 }

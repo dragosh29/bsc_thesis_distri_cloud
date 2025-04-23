@@ -17,10 +17,13 @@ class NodeManager:
         self.executor = TaskExecutor()
         self.heartbeat = Heartbeat()
         self.node_id = None
-        self.load_config()
         self.running = False
+        self.should_run = False
         self.last_task_id = None
         self.last_assignment_info = None
+        self.heartbeat_thread = None
+        self.task_loop_thread = None
+        self.load_config()
 
     def load_config(self):
         if os.path.exists(CONFIG_FILE):
@@ -58,12 +61,17 @@ class NodeManager:
             raise Exception("[NODE MANAGER] Node is not registered. Please register first.")
 
         print("[NODE MANAGER] Starting Node tasks...")
-        threading.Thread(target=self.heartbeat.start, daemon=True).start()
         self.running = True
-        threading.Thread(target=self._run_main_loop, daemon=True).start()
+        self.should_run = True
+
+        self.heartbeat_thread = threading.Thread(target=self.heartbeat.start, daemon=True)
+        self.heartbeat_thread.start()
+
+        self.task_loop_thread = threading.Thread(target=self._run_main_loop, daemon=True)
+        self.task_loop_thread.start()
 
     def _run_main_loop(self):
-        while True:
+        while self.should_run:
             try:
                 task = self.api_client.fetch_task()
                 if task:
@@ -82,3 +90,11 @@ class NodeManager:
 
     def stop(self):
         print("[NODE MANAGER] Stopping Node Manager...")
+        self.should_run = False
+        self.running = False
+        self.heartbeat.stop()
+
+        if self.heartbeat_thread:
+            self.heartbeat_thread.join(timeout=5)
+        if self.task_loop_thread:
+            self.task_loop_thread.join(timeout=5)
