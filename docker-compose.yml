@@ -36,7 +36,6 @@ services:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - DEBUG=True
-    # Volume mount: maps your host's ./hub_component to /app in the container
     volumes:
       - ./hub_component:/app
     ports:
@@ -61,7 +60,6 @@ services:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - DEBUG=True
-    # Volume mount same folder for Celery code
     volumes:
       - ./hub_component:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -75,7 +73,6 @@ services:
     depends_on:
       - celery
       - redis
-    # Volume mount so it sees the same Django / Celery code
     volumes:
       - ./hub_component:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -95,9 +92,13 @@ services:
       - VITE_LOCAL_API_BASE_URL=http://localhost:18001/api
       - VITE_APP_TITLE=DistriCloud
       - VITE_ENABLE_DEBUG=true
+      - CHOKIDAR_USEPOLLING=true
     # Volume mount for immediate changes in frontend code
     volumes:
+      # 1) Bind mount your local code so you can edit files live
       - ./node_component/frontend:/app
+      # 2) Use a named volume for node_modules so the container sees them
+      - node_modules_frontend:/app/node_modules
 
   node:
     build:
@@ -110,7 +111,7 @@ services:
     environment:
       - NODE_ENV=development
       - DOCKER_HOST=unix:///var/run/docker.sock
-    # Mount code + Docker socket (if your node service needs to manage containers)
+      - HUB_API_BASE_URL=http://host.docker.internal:18000/api
     volumes:
       - ./node_component/node:/app
       - /var/run/docker.sock:/var/run/docker.sock
@@ -118,3 +119,4 @@ services:
 
 volumes:
   postgres_data:
+  node_modules_frontend:  # Named volume for frontend's node_modules

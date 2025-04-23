@@ -1,10 +1,31 @@
 from rest_framework import serializers
 from hub.models import Node, Task, TaskAssignment
 
+
 class NodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Node
         fields = '__all__'
+
+class NodeRegistrationSerializer(serializers.Serializer):
+    """
+    Serializer for node registration via API.
+    """
+    name = serializers.CharField(max_length=255, required=True)
+    ip_address = serializers.IPAddressField(required=True)
+    resources_capacity = serializers.JSONField(required=True)
+    free_resources = serializers.JSONField(required=True)
+    class Meta:
+        model = Node
+        fields = ['name', 'ip_address', 'resource_capacity', 'free_resources']
+
+    def create(self, validated_data):
+        """
+        Create and return a new Node instance with default values for fields
+        that are not included in the request.
+        """
+        return Node.objects.create(**validated_data)
+
 
 class TaskSerializer(serializers.ModelSerializer):
     class Meta:

@@ -1,0 +1,67 @@
+[
+  {
+    "description": "Alpine echo test",
+    "container_spec": {
+      "image": "alpine:latest",
+      "command": "echo Hello from Alpine"
+    },
+    "resource_requirements": {
+      "cpu": 0.1,
+      "ram": 128
+    },
+    "trust_index_required": 1.0,
+    "overlap_count": 1
+  },
+  {
+    "description": "Python version check",
+    "container_spec": {
+      "image": "python:3.9-slim",
+      "command": "python --version"
+    },
+    "resource_requirements": {
+      "cpu": 0.2,
+      "ram": 256
+    },
+    "trust_index_required": 3.0,
+    "overlap_count": 2
+  },
+  {
+    "description": "Ubuntu info task",
+    "container_spec": {
+      "image": "ubuntu:22.04",
+      "command": "bash -c 'ls / && date'"
+    },
+    "resource_requirements": {
+      "cpu": 0.3,
+      "ram": 512
+    },
+    "trust_index_required": 5.0,
+    "overlap_count": 1
+  },
+  {
+    "description": "Node.js version check",
+    "container_spec": {
+      "image": "node:18-alpine",
+      "command": "node -v"
+    },
+    "resource_requirements": {
+      "cpu": 0.15,
+      "ram": 256
+    },
+    "trust_index_required": 2.0,
+    "overlap_count": 1
+  },
+  {
+    "description": "Stress test CPU",
+    "container_spec": {
+      "image": "alpine:latest",
+      "command": "sh -c 'apk add --no-cache stress && stress --cpu 1 --timeout 5'"
+    },
+    "resource_requirements": {
+      "cpu": 0.5,
+      "ram": 128
+    },
+    "trust_index_required": 4.0,
+    "overlap_count": 1
+  }
+]

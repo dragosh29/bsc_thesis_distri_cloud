@@ -4,8 +4,7 @@ import os
 
 from utils import get_ip_address
 
-HUB_API_BASE_URL = "http://localhost:18000/api"
-NODE_NAME = "NODE_A"
+HUB_API_BASE_URL = os.getenv("HUB_API_BASE_URL", "http://localhost:18000/api")
 HEARTBEAT_INTERVAL = 30  # in seconds
 IP_ADDRESS = get_ip_address()
 

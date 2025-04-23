@@ -9,4 +9,6 @@ urlpatterns = [
     path('tasks/submit_task/', views.submit_task, name='submit_task'),
     path('tasks', views.list_tasks, name='list'),
     path('nodes', views.list_nodes, name='list'),
+    path('nodes/<uuid:node_id>', views.fetch_node, name='fetch_node'),
+    path('tasks/<uuid:task_id>/', views.get_task, name='get_task'),
 ]

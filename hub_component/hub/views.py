@@ -1,13 +1,15 @@
 # views.py
+import logging
 
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from hub.models import Node, Task, TaskAssignment
-from hub.serializers import NodeSerializer, TaskSerializer, TaskSubmissionSerializer
+from hub.serializers import NodeSerializer, TaskSerializer, TaskSubmissionSerializer, NodeRegistrationSerializer
 from hub.tasks import validate_docker_image_task
 
+logging.basicConfig(level=logging.INFO)
 
 @api_view(['GET'])
 def list_nodes(request):
@@ -16,6 +18,20 @@ def list_nodes(request):
     """
     nodes = Node.objects.all()
     serializer = NodeSerializer(nodes, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+def fetch_node(request, node_id):
+    """
+    Get a specific node by ID.
+    """
+    logging.info(f"Fetching node {node_id}")
+    try:
+        node = Node.objects.get(id=node_id)
+    except Node.DoesNotExist:
+        return Response({"error": "Node not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    serializer = NodeSerializer(node)
     return Response(serializer.data)
 
 @api_view(['GET'])
@@ -32,11 +48,12 @@ def register_node(request):
     """
     Registers a new node in the system.
     """
-    serializer = NodeSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    req_serializer = NodeRegistrationSerializer(data=request.data)
+    if req_serializer.is_valid():
+        node = req_serializer.save()
+        res_serializer = NodeSerializer(node)
+        return Response(res_serializer.data, status=status.HTTP_201_CREATED)
+    return Response(req_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
@@ -177,3 +194,36 @@ def submit_task(request):
     validate_docker_image_task.apply_async(args=[str(task.id)])
 
     return Response({"message": "Task submitted and queued for validation", "task_id": str(task.id)}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+def get_task(request, task_id):
+    """
+    Get task details by ID.
+    If a node_id is provided as query param, include assignment context for that node.
+    """
+    try:
+        task = Task.objects.get(id=task_id)
+    except Task.DoesNotExist:
+        return Response({"error": "Task not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    data = TaskSerializer(task).data
+
+    node_id = request.query_params.get("node_id")
+    if node_id:
+        try:
+            assignment = TaskAssignment.objects.get(task_id=task_id, node_id=node_id)
+            data["assignment"] = {
+                "node_id": node_id,
+                "started_at": assignment.started_at,
+                "completed_at": assignment.completed_at,
+                "result": assignment.result
+            }
+        except TaskAssignment.DoesNotExist:
+            data["assignment"] = {
+                "node_id": node_id,
+                "message": "No assignment found for this node."
+            }
+
+    return Response(data, status=status.HTTP_200_OK)
+

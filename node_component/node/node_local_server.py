@@ -3,6 +3,13 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import os
 from node_manager import NodeManager
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:18080"}})
@@ -13,33 +20,44 @@ node_manager = NodeManager()
 
 @app.route('/api/node', methods=['GET'])
 def get_node_status():
-    """Fetch Node status."""
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, 'r') as f:
-            return jsonify({"status": "registered", "node_id": json.load(f).get("node_id")})
+            config = json.load(f)
+
+        # ✅ Refresh values from disk to memory (optional but cleaner)
+        node_manager.node_id = config.get("node_id")
+        node_manager.last_task_id = config.get("last_task_id")
+
+        return jsonify({
+            "status": "registered",
+            "node_id": node_manager.node_id,
+            "is_running": node_manager.running,
+            "last_task_id": node_manager.last_task_id,
+            "resource_usage": node_manager.get_resource_usage() if node_manager.running else None
+        }), 200
+
     return jsonify({
         "status": "unregistered",
-        "message": "Node is not registered. Please register to proceed."
+        "message": "Node is not registered. Please register to proceed.",
+        "node_id": node_manager.node_id
     }), 200
 
 
 @app.route('/api/node/register', methods=['POST'])
 def register_node():
-    """
-    Step 1: Receive node name from the frontend.
-    Step 2: Trigger Node Manager to complete registration with the Hub.
-    """
     data = request.json
     node_name = data.get('name')
-
+    logging.info(f"Registering Node with name: {node_name}")
     if not node_name:
         return jsonify({"error": "Node name is required."}), 400
 
     try:
         success = node_manager.register(node_name)
         if success:
-            return jsonify({"message": "Node registered successfully."}), 200
+            node_id = node_manager.node_id
+            return jsonify({"message": "Node registered successfully.", "id": node_id}), 200
         else:
+            logging.error(success)
             return jsonify({"error": "Failed to register node."}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -47,9 +65,6 @@ def register_node():
 
 @app.route('/api/node/start', methods=['POST'])
 def start_node():
-    """
-    Start the Node Manager.
-    """
     try:
         node_manager.start()
         return jsonify({"message": "Node Manager started successfully."}), 200
@@ -59,9 +74,6 @@ def start_node():
 
 @app.route('/api/node/stop', methods=['POST'])
 def stop_node():
-    """
-    Stop the Node Manager.
-    """
     try:
         node_manager.stop()
         return jsonify({"message": "Node Manager stopped successfully."}), 200
