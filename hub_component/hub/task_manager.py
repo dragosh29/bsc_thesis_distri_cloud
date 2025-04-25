@@ -320,8 +320,16 @@ class TaskManager:
 
     def handle_persistently_failing_tasks(self):
         """
-        Delete tasks that have exceeded the maximum retry threshold.
+        Delete tasks that have exceeded the maximum retry threshold or are invalid.
         """
+        invalid_tasks = Task.objects.filter(
+            status='invalid',
+        )
+
+        if invalid_tasks.exists():
+            invalid_tasks.delete()
+            logger.info(f"[handle_persistently_failing_tasks] Deleted {invalid_tasks.count()} invalid tasks.")
+
         persistently_failing_tasks = Task.objects.filter(
             stale_count__gte=self.max_stale_count,
             status='failed'

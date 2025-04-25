@@ -111,7 +111,7 @@ services:
     environment:
       - NODE_ENV=development
       - DOCKER_HOST=unix:///var/run/docker.sock
-      - HUB_API_BASE_URL=http://host.docker.internal:18000/api
+      - HUB_API_BASE_URL=http://localhost:18000/api
     volumes:
       - ./node_component/node:/app
       - /var/run/docker.sock:/var/run/docker.sock

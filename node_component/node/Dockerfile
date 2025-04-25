@@ -4,6 +4,9 @@ FROM python:3.12
 # Set working directory
 WORKDIR /app
 
+# Install Docker CLI
+RUN apt-get update && apt-get install -y docker.io
+
 # Copy project files
 COPY . .
 

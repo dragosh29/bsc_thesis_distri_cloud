@@ -2,8 +2,8 @@ import time
 from api_client import APIClient
 
 class Heartbeat:
-    def __init__(self):
-        self.api_client = APIClient()
+    def __init__(self, api_client):
+        self.api_client = api_client
         self.should_run = False
 
     def start(self):

@@ -8,6 +8,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     python3-dev \
     libpq-dev \
+    docker.io \
     && apt-get clean
 
 # Copy requirements

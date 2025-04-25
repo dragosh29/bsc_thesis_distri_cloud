@@ -15,7 +15,7 @@ class NodeManager:
     def __init__(self):
         self.api_client = APIClient()
         self.executor = TaskExecutor()
-        self.heartbeat = Heartbeat()
+        self.heartbeat = Heartbeat(self.api_client)
         self.node_id = None
         self.running = False
         self.should_run = False
@@ -43,7 +43,6 @@ class NodeManager:
         print("[NODE MANAGER] Registering Node with Hub API...")
         try:
             response = self.api_client.register_node(node_name)
-            logging.info(f"Node registration response: {response}")
             self.node_id = response.get('id')
             if self.node_id:
                 self.save_config(self.node_id)

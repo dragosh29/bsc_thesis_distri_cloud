@@ -76,7 +76,9 @@ def handle_persistently_failing_tasks_task(*args, **kwargs):
 @shared_task
 def validate_docker_image_task(task_id):
     manager = TaskManager()
-    manager.validate_docker_image(task_id)
+    status = manager.validate_docker_image(task_id)
+    if 'error' in status:
+        logger.error(f"[validate_docker_image_task] Error validating Docker image for task {task_id}: {status['error']}")
 
 
 @shared_task
