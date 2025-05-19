@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'hub',
+    'hub.app.HubConfig',
     'rest_framework',
     'corsheaders',
 ]
@@ -56,7 +56,6 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# Allow all origins during development
 CORS_ALLOW_ALL_ORIGINS = True
 
 # CORS_ALLOWED_ORIGINS = [
@@ -93,7 +92,6 @@ WSGI_APPLICATION = 'licenta.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -104,8 +102,6 @@ DATABASES = {
         'PORT': config('POSTGRES_PORT', default='5432'),
     }
 }
-
-
 
 
 # Password validation
@@ -150,25 +146,28 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
-# Celery Configuration
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_CACHE_BACKEND = 'django-cache'
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
-CELERY_RESULT_EXPIRES = 3600  # Results will expire after 1 hour
+CELERY_RESULT_EXPIRES = 3600
 CELERY_TIMEZONE = 'UTC'
 CELERY_BEAT_SCHEDULE = {
     'check_node_health': {
         'task': 'hub.tasks.check_node_health',
-        'schedule': 60.0,  # Run every 60 seconds
+        'schedule': 60.0,
     },
     'orchestrate_task_distribution': {
         'task': 'hub.tasks.orchestrate_task_distribution',
-        'schedule': 120.0,  # Run every 30 seconds
+        'schedule': 120.0,
     },
 }
+
+REDIS_CHANNEL_PREFIX = "sse"
+REDIS_TASK_UPDATES_CHANNEL = f"{REDIS_CHANNEL_PREFIX}:task_updates"
+REDIS_NETWORK_ACTIVITY_CHANNEL = f"{REDIS_CHANNEL_PREFIX}:network_activity"
 
 ACTIVE_QUEUE_SIZE = 10
 VALIDATION_THRESHOLD = 0.6

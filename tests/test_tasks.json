@@ -10,7 +10,8 @@
       "ram": 128
     },
     "trust_index_required": 1.0,
-    "overlap_count": 1
+    "overlap_count": 1,
+    "submitted_by": "5b05b6b9-ede7-45b8-95c9-d622857d8368"
   },
   {
     "description": "Python version check",
@@ -23,7 +24,8 @@
       "ram": 256
     },
     "trust_index_required": 3.0,
-    "overlap_count": 2
+    "overlap_count": 2,
+    "submitted_by": "5b05b6b9-ede7-45b8-95c9-d622857d8368"
   },
   {
     "description": "Ubuntu info task",
@@ -36,7 +38,8 @@
       "ram": 512
     },
     "trust_index_required": 5.0,
-    "overlap_count": 1
+    "overlap_count": 1,
+    "submitted_by": "5b05b6b9-ede7-45b8-95c9-d622857d8368"
   },
   {
     "description": "Node.js version check",
@@ -49,7 +52,8 @@
       "ram": 256
     },
     "trust_index_required": 2.0,
-    "overlap_count": 1
+    "overlap_count": 1,
+    "submitted_by": "5b05b6b9-ede7-45b8-95c9-d622857d8368"
   },
   {
     "description": "Stress test CPU",
@@ -62,6 +66,7 @@
       "ram": 128
     },
     "trust_index_required": 4.0,
-    "overlap_count": 1
+    "overlap_count": 1,
+    "submitted_by": "5b05b6b9-ede7-45b8-95c9-d622857d8368"
   }
 ]

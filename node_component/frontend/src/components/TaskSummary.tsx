@@ -1,57 +1,84 @@
 import React from 'react';
 import dayjs from 'dayjs';
 import Badge from './Badge';
-import { badgeBaseStyle } from '../styles/shared';
-
-interface Task {
-  id: string;
-  description?: string;
-  status: string;
-  started_at: string;
-  completed_at?: string;
-}
+import { badgeBaseStyle, cardStyle } from '../styles/shared';
+import { Task, TaskAssignment } from '../types/api';
+import { getUpdatedTimestampLabel, translateTaskStatus } from '../utils/format';
 
 interface TaskSummaryProps {
-  task?: Task;
+  task?: Task | TaskAssignment;
   statusColorMap: Record<string, string>;
-  translateStatus: (status: string) => string;
+  noTaskMessage?: string;
+  title?: string;
 }
 
 const TaskSummary: React.FC<TaskSummaryProps> = ({
   task,
   statusColorMap,
-  translateStatus,
+  noTaskMessage = 'No task has been executed yet.',
+  title = ''
 }) => {
-  if (!task) return <i>No task has been executed yet.</i>;
+  if (!task) return <i>{noTaskMessage}</i>;
 
   const statusColor = statusColorMap[task.status] || '#ccc';
-  const itemStyle: React.CSSProperties = { marginBottom: '6px' };
+  const isAssignment = 'started_at' in task && 'status' in task && !('created_at' in task);
+
+  const renderTimestamps = () => {
+    if (isAssignment) {
+      return (
+        <>
+          <div style={{ marginBottom: '8px' }}>
+            <strong>Started:</strong> {dayjs((task as TaskAssignment).started_at).format('YYYY-MM-DD HH:mm:ss')}
+          </div>
+          {(task as TaskAssignment).completed_at && (
+            <div style={{ marginBottom: '8px' }}>
+              <strong>Completed:</strong> {dayjs((task as TaskAssignment).completed_at!).format('YYYY-MM-DD HH:mm:ss')}
+            </div>
+          )}
+        </>
+      );
+    } else {
+      const t = task as Task;
+      const updatedLabel = getUpdatedTimestampLabel(t.status);
+  
+      return (
+        <>
+          <div style={{ marginBottom: '8px' }}>
+            <strong>Submitted at:</strong> {dayjs(t.created_at).format('YYYY-MM-DD HH:mm:ss')}
+          </div>
+          {t.updated_at && (
+            <div style={{ marginBottom: '8px' }}>
+              <strong>{updatedLabel}</strong> {dayjs(t.updated_at).format('YYYY-MM-DD HH:mm:ss')}
+            </div>
+          )}
+        </>
+      );
+    }
+  };
+  
 
   return (
-    <div style={{ paddingTop: '10px', borderTop: '1px solid #ccc' }}>
-      <div style={{ fontWeight: 'bold', fontSize: '20px', marginBottom: '8px' }}>
-        Last/Active Task
-      </div>
-      <div style={{ marginTop: '8px', paddingLeft: '10px', lineHeight: '1.6', fontSize: '16px' }}>
-        <div style={itemStyle}>
-          <strong>Task Name:</strong> {task.description || 'Unnamed Task'}
+    <div style={cardStyle}>
+      {title && (
+        <div style={{ fontSize: '20px', fontWeight: 600, marginBottom: '25px', textAlign: 'center' }}>
+          {title}
         </div>
-        <div style={itemStyle}>
+      )}
+      <div style={{ fontSize: '18px', marginBottom: '15px', fontWeight: 700 }}>
+        {task.description || 'Unnamed Task'}
+      </div>
+
+      <div style={{ lineHeight: '1.8', fontSize: '15px' }}>
+        <div style={{ marginBottom: '8px' }}>
           <strong>Status:</strong>{' '}
           <Badge
-            label={translateStatus(task.status)}
+            label={translateTaskStatus(task.status)}
             backgroundColor={statusColor}
             style={badgeBaseStyle}
           />
         </div>
-        <div style={itemStyle}>
-          <strong>Started:</strong> {dayjs(task.started_at).format('YYYY-MM-DD HH:mm:ss')}
-        </div>
-        {task.completed_at && (
-          <div style={itemStyle}>
-            <strong>Completed:</strong> {dayjs(task.completed_at).format('YYYY-MM-DD HH:mm:ss')}
-          </div>
-        )}
+
+        {renderTimestamps()}
       </div>
     </div>
   );

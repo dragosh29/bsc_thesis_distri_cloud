@@ -11,4 +11,7 @@ urlpatterns = [
     path('nodes', views.list_nodes, name='list'),
     path('nodes/<uuid:node_id>', views.fetch_node, name='fetch_node'),
     path('tasks/<uuid:task_id>/', views.get_task, name='get_task'),
+    path('tasks/submitted_tasks', views.get_submitted_tasks, name='get_submitted_tasks'),
+    path('sse/network_activity/', views.sse_network_activity, name='sse_network_activity'),
+    path('sse/task_updates/', views.sse_task_updates, name='sse_task_updates'),
 ]

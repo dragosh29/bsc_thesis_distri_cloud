@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState, useRef } from 'react';
+import { useEffect, useReducer, useState, useRef, useMemo } from 'react';
 import {
   fetchFullNode,
   fetchTaskDetails,
@@ -8,6 +8,7 @@ import {
   stopNode,
 } from '../services/api';
 import { FullNode, NodeConfig, TaskAssignment } from '../types/api';
+import { shallowEqualExcept } from '../utils/equality';
 
 interface State {
   nodeConfig: NodeConfig | null;
@@ -22,18 +23,31 @@ type Action =
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_NODE_CONFIG': {
-      const existingTask =
-        state.nodeConfig?.last_task_id === action.payload.last_task_id
-          ? state.nodeConfig?.last_task
-          : undefined;
+      const existing = state.nodeConfig;
+      const incoming = action.payload;
+
+      if (
+        existing &&
+        shallowEqualExcept(existing, incoming, ['resource_usage', 'last_task']) &&
+        existing.last_task_id === incoming.last_task_id
+      ) {
+        return state;
+      }
+
+      let preservedTask: TaskAssignment | undefined = undefined;
+      if (existing && existing.last_task_id === incoming.last_task_id) {
+        preservedTask = existing.last_task;
+      }
+
       return {
         ...state,
         nodeConfig: {
-          ...action.payload,
-          last_task: existingTask,
+          ...incoming,
+          last_task: preservedTask,
         },
       };
     }
+
     case 'SET_LAST_TASK': {
       if (!state.nodeConfig) return state;
       return {
@@ -44,9 +58,18 @@ function reducer(state: State, action: Action): State {
         },
       };
     }
+
     case 'SET_FULL_NODE': {
-      return { ...state, fullNode: action.payload };
+      const existing = state.fullNode;
+      const incoming = action.payload;
+
+      if (existing && shallowEqualExcept(existing, incoming, ['resourceAvailable'])) {
+        return state;
+      }
+
+      return { ...state, fullNode: incoming };
     }
+
     default:
       return state;
   }
@@ -61,6 +84,7 @@ export function useNodeData() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isStopping, setIsStopping] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const lastTaskIdRef = useRef<string | null>(null);
 
   const fetchLastTaskDetails = async (taskId: string, nodeId: string) => {
@@ -72,16 +96,21 @@ export function useNodeData() {
   };
 
   const fetchNodeStatus = async () => {
-    const config = await fetchNodeConfig();
-    dispatch({ type: 'SET_NODE_CONFIG', payload: config });
+    try {
+      setIsLoading(true);
+      const config = await fetchNodeConfig();
+      dispatch({ type: 'SET_NODE_CONFIG', payload: config });
 
-    if (config.node_id) {
-      const fullNode = await fetchFullNode(config.node_id);
-      dispatch({ type: 'SET_FULL_NODE', payload: fullNode });
+      if (config.node_id) {
+        const fullNode = await fetchFullNode(config.node_id);
+        dispatch({ type: 'SET_FULL_NODE', payload: fullNode });
 
-      if (config.last_task_id) {
-        await fetchLastTaskDetails(config.last_task_id, config.node_id);
+        if (config.last_task_id) {
+          await fetchLastTaskDetails(config.last_task_id, config.node_id);
+        }
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -112,14 +141,22 @@ export function useNodeData() {
     return () => clearInterval(interval);
   }, []);
 
-  return {
+  return useMemo(() => ({
     nodeConfig: state.nodeConfig,
     fullNode: state.fullNode,
     isRegistering,
     isStarting,
     isStopping,
+    isLoading,
     handleRegisterNode,
     handleStartNode,
     handleStopNode,
-  };
+  }), [
+    state.nodeConfig,
+    state.fullNode,
+    isRegistering,
+    isStarting,
+    isStopping,
+    isLoading
+  ]);
 }

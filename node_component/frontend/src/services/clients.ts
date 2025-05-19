@@ -15,3 +15,10 @@ export const hubApiClient = axios.create({
   },
   timeout: 5000,
 });
+
+export const sseClient = {
+  getEventSource: (endpoint: string) => {
+    const hubBaseUrl = import.meta.env.VITE_HUB_API_BASE_URL;
+    return new EventSource(`${hubBaseUrl}${endpoint}`);
+  },
+};

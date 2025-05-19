@@ -44,7 +44,7 @@ const NodeRuntimeToggle: React.FC<NodeRuntimeToggleProps> = ({
       {isRunning && usage && (
         <div style={{ marginBottom: '10px' }}>
           <div><strong>CPU Usage:</strong> {usage.cpu}%</div>
-          <div><strong>RAM Usage:</strong> {usage.ram} MB</div>
+          <div><strong>RAM Usage:</strong> {usage.ram} GB</div>
         </div>
       )}
 

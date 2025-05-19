@@ -50,7 +50,6 @@ class Node(models.Model):
         # }
     )
 
-    # Last heartbeat or status update
     last_heartbeat = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -71,8 +70,7 @@ class Node(models.Model):
 
     def mark_inactive_if_stale(self, threshold_seconds=60):
         """
-        Optional helper: Mark this node as inactive if no heartbeat
-        in `threshold_seconds`.
+        Mark this node as inactive if no heartbeat in `threshold_seconds`.
         """
         time_since_heartbeat = (timezone.now() - self.last_heartbeat).total_seconds()
         if time_since_heartbeat > threshold_seconds:
@@ -85,8 +83,7 @@ class Task(models.Model):
     """
     A task to be executed by one or more Nodes. Contains a container spec
     for Docker-based execution and resource requirements so we can
-    schedule properly. We also keep track of overlap_count for
-    majority-based validation if needed.
+    schedule properly.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -101,12 +98,12 @@ class Task(models.Model):
             ('completed', 'Completed'),
             ('failed', 'Failed'),
             ('validating', 'Validating'),
+            ('validated', 'Validated'),
             ('invalid', 'Invalid')
         ],
         default='pending'
     )
 
-    # Many-to-many for cross-validation or multiple assignment
     assigned_nodes = models.ManyToManyField(
         'Node',
         through='TaskAssignment',
@@ -128,17 +125,21 @@ class Task(models.Model):
         # e.g., {"cpu": 2, "ram": 4}
     )
 
-    # Overlap or majority-based validations:
     overlap_count = models.PositiveSmallIntegerField(default=1)
 
-    # Capture final result or metadata:
     result = models.JSONField(null=True, blank=True)
 
-    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # Staleness logic
+    submitted_by = models.ForeignKey(
+        Node,
+        on_delete=models.CASCADE,
+        related_name='submitted_tasks',
+        null=True,
+        blank=True
+    )
+
     stale_count = models.PositiveIntegerField(default=0)
     last_attempted = models.DateTimeField(null=True, blank=True)
 
@@ -188,7 +189,7 @@ class TaskAssignment(models.Model):
     validated = models.BooleanField(default=False)
 
     assigned_at = models.DateTimeField(auto_now_add=True)
-    started_at = models.DateTimeField(null=True, blank=True)   # Optional: when the node actually started
+    started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
@@ -219,8 +220,8 @@ class Heartbeat(models.Model):
 
     def update_node_status(self):
         """
-        Example helper: If this heartbeat is 'healthy', mark the node 'active';
-        if 'unhealthy', mark it 'inactive'. (We do not mark nodes as 'failed'.)
+        If this heartbeat is 'healthy', mark the node 'active';
+        if 'unhealthy', mark it 'inactive'.
         """
         if self.status == 'healthy' and self.node.status != 'active':
             self.node.status = 'active'

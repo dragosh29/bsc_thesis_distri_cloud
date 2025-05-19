@@ -1,15 +1,14 @@
-# views.py
-import logging
-
+import redis
+from django.conf import settings
+from django.http import StreamingHttpResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from hub.models import Node, Task, TaskAssignment
-from hub.serializers import NodeSerializer, TaskSerializer, TaskSubmissionSerializer, NodeRegistrationSerializer
+from hub.serializers import NodeSerializer, TaskSerializer, NodeRegistrationSerializer
 from hub.tasks import validate_docker_image_task
 
-logging.basicConfig(level=logging.INFO)
 
 @api_view(['GET'])
 def list_nodes(request):
@@ -25,7 +24,6 @@ def fetch_node(request, node_id):
     """
     Get a specific node by ID.
     """
-    logging.info(f"Fetching node {node_id}")
     try:
         node = Node.objects.get(id=node_id)
     except Node.DoesNotExist:
@@ -75,7 +73,6 @@ def fetch_task(request):
     except Node.DoesNotExist:
         return Response({"error": "Node not found."}, status=status.HTTP_404_NOT_FOUND)
 
-    # Find the earliest assignment that isn't completed
     assignment = TaskAssignment.objects.filter(
         node=node,
         completed_at__isnull=True
@@ -84,11 +81,9 @@ def fetch_task(request):
     if not assignment:
         return Response({"message": "No assigned tasks available."}, status=status.HTTP_404_NOT_FOUND)
 
-    # If you want to mark that the task started:
     assignment.started_at = timezone.now()
     assignment.save(update_fields=['started_at'])
 
-    # Return the full Task to the node
     task_data = TaskSerializer(assignment.task).data
     return Response(task_data, status=status.HTTP_200_OK)
 
@@ -114,20 +109,15 @@ def submit_task_result(request):
     if assignment.completed_at:
         return Response({"error": "This TaskAssignment result was already submitted."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Save result
     assignment.result = result
     assignment.completed_at = timezone.now()
     assignment.save()
 
-    # Check if all assignments are completed
-    total_assignments = TaskAssignment.objects.filter(task_id=task_id).count()
-    completed_assignments = TaskAssignment.objects.filter(task_id=task_id, completed_at__isnull=False).count()
-
-    if completed_assignments == total_assignments:
-        assignment.task.status = 'completed'
-        assignment.task.save()
-
-        # Trigger Validation
+    assignments = TaskAssignment.objects.filter(task_id=task_id)
+    if all(a.completed_at is not None for a in assignments):
+        task = Task.objects.get(id=task_id)
+        task.status = 'completed'
+        task.save()
         from hub.task_manager import TaskManager
         manager = TaskManager()
         manager.validate_task(task_id)
@@ -157,8 +147,6 @@ def node_heartbeat(request):
     if isinstance(free_resources, dict):
         node.free_resources = free_resources
 
-    # Set the node status to active if it isn't already busy or something else
-    # Adjust this logic according to your needs:
     if node.status != 'busy':
         node.status = 'active'
 
@@ -171,6 +159,15 @@ def submit_task(request):
     """
     Submit a task and queue it for Docker image validation.
     """
+    submitted_by = request.data.get('submitted_by')
+    if not submitted_by:
+        return Response({"error": "submitted_by is required. Only registered nodes can submit."}, status=status.HTTP_400_BAD_REQUEST)
+    node = None
+    try:
+        node = Node.objects.get(id=submitted_by)
+    except Node.DoesNotExist:
+        return Response({"error": "Node not found."}, status=status.HTTP_404_NOT_FOUND)
+
     description = request.data.get('description')
     container_spec = request.data.get('container_spec', {})
     resource_requirements = request.data.get('resource_requirements', {})
@@ -180,17 +177,16 @@ def submit_task(request):
     if not (description and container_spec.get('image') and container_spec.get('command')):
         return Response({"error": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Create a task in 'validating' state
     task = Task.objects.create(
         description=description,
         container_spec=container_spec,
         resource_requirements=resource_requirements,
         trust_index_required=trust_index_required,
         overlap_count=overlap_count,
-        status='validating'
+        status='validating',
+        submitted_by=node
     )
 
-    # Trigger Docker image validation
     validate_docker_image_task.apply_async(args=[str(task.id)])
 
     return Response({"message": "Task submitted and queued for validation", "task_id": str(task.id)}, status=status.HTTP_201_CREATED)
@@ -227,3 +223,72 @@ def get_task(request, task_id):
 
     return Response(data, status=status.HTTP_200_OK)
 
+
+@api_view(['GET'])
+def get_submitted_tasks(request):
+    """
+    Get all tasks submitted by a specific node.
+    """
+    node_id = request.query_params.get('node_id')
+    if not node_id:
+        return Response({"error": "node_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        node = Node.objects.get(id=node_id)
+    except Node.DoesNotExist:
+        return Response({"error": "Node not found."}, status=status.HTTP_404_NOT_FOUND)
+
+    tasks = Task.objects.filter(submitted_by=node)
+    serializer = TaskSerializer(tasks, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+def network_activity_stream():
+    redis_client = redis.StrictRedis.from_url(settings.CELERY_BROKER_URL)
+    pubsub = redis_client.pubsub()
+    pubsub.subscribe(settings.REDIS_NETWORK_ACTIVITY_CHANNEL)
+
+    try:
+        for message in pubsub.listen():
+            if message["type"] == "message":
+                yield f"data: {message['data'].decode('utf-8')}\n\n"
+    except GeneratorExit:
+        pubsub.close()
+
+
+def task_update_stream(node_id):
+    redis_client = redis.StrictRedis.from_url(settings.CELERY_BROKER_URL)
+    pubsub = redis_client.pubsub()
+    channel = settings.REDIS_TASK_UPDATES_CHANNEL
+    pubsub.subscribe(channel)
+
+    try:
+        for message in pubsub.listen():
+            if message["type"] == "message":
+                yield f"data: {message['data'].decode('utf-8')}\n\n"
+    except GeneratorExit:
+        pubsub.close()
+
+
+def sse_network_activity(request):
+    response = StreamingHttpResponse(network_activity_stream(), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    response['Access-Control-Allow-Origin'] = '*'
+    response['Access-Control-Allow-Methods'] = 'GET'
+    response['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response
+
+
+def sse_task_updates(request):
+    node_id = request.GET.get('node_id')
+    if not node_id:
+        return Response({"error": "node_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    response = StreamingHttpResponse(task_update_stream(node_id), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    response['Access-Control-Allow-Origin'] = '*'
+    response['Access-Control-Allow-Methods'] = 'GET'
+    response['Access-Control-Allow-Headers'] = 'Content-Type'
+    return response

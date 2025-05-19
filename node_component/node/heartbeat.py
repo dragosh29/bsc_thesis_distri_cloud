@@ -1,5 +1,4 @@
 import time
-from api_client import APIClient
 
 class Heartbeat:
     def __init__(self, api_client):

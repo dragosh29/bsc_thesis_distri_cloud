@@ -12,10 +12,10 @@ from hub.task_manager import TaskManager, logger
 def check_node_health():
     """
     Periodically checks node heartbeats and updates their status based on inactivity.
-    - Any 'active' node that hasn't had a heartbeat in the last 5 minutes becomes 'inactive'.
+    - Any 'active' node that hasn't had a heartbeat in the last 1 minute becomes 'inactive'.
     - Delegates task handling logic to TaskManager.
     """
-    threshold_inactive = timezone.now() - timedelta(minutes=5)
+    threshold_inactive = timezone.now() - timedelta(minutes=1)
 
     # Mark active nodes as inactive if they haven't sent a heartbeat in 5+ minutes
     inactive_nodes = Node.objects.filter(

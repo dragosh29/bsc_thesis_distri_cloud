@@ -4,6 +4,8 @@ import { Routes, Route } from 'react-router-dom';
 import Node from './pages/Node';
 // import Nodes from './pages/Nodes';
 // import Tasks from './pages/Tasks';
+import SubmitTask from './components/SubmitTask';
+import SubmittedTasks from './pages/SubmittedTasks';
 
 const App: React.FC = () => {
   return (
@@ -12,7 +14,9 @@ const App: React.FC = () => {
       {/* <Route path="/login" element={<Login />} /> */}
       <Route path="/node" element={<Node />} />
       {/* <Route path="/nodes" element={<Nodes />} /> */}
-      {/* <Route path="/tasks" element={<Tasks />} /> */}
+      <Route path="/submitted-tasks" element={<SubmittedTasks />} />
+      <Route path="/submit-task" element={<SubmitTask />} />
+      
     </Routes>
   );
 };
