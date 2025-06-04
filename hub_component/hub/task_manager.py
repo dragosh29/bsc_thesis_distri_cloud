@@ -38,7 +38,7 @@ class TaskManager:
         time_waiting = (timezone.now() - task.created_at).total_seconds()
         # If no resource requirements, use 1 so we don't divide by zero
         resource_weight = task.resource_requirements.get("cpu_cores", 0.5) + task.resource_requirements.get("ram_gb",
-                                                                                                            0.5)
+                                                                                                            0.5) / 2
         # Give a penalty for tasks that have gone stale multiple times
         stale_penalty = task.stale_count * STALE_PENALTY_MULTIPLIER
 

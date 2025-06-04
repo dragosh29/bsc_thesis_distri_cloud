@@ -82,9 +82,12 @@ class NodeManager:
             time.sleep(60)
 
     def get_resource_usage(self):
+        cpu = psutil.cpu_percent(interval=1)
+        used_bytes = psutil.virtual_memory().used
+        used_gb = used_bytes / 1024 ** 3
         return {
-            "cpu": psutil.cpu_percent(interval=1),
-            "ram": psutil.virtual_memory().used // 1024**2
+            "cpu": cpu,
+            "ram": round(used_gb, 2)
         }
 
     def stop(self):

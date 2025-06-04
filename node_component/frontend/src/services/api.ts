@@ -66,6 +66,11 @@ export async function fetchSubmittedTasks(node_id: string): Promise<Task[]> {
   }));
 }
 
+export async function fetchNetworkActivity(): Promise<NetworkActivityData> {
+  const { data } = await hubApiClient.get('/network_activity');
+  return data.data;
+}
+
 export const subscribeToNetworkActivity = (
   onData: (data: NetworkActivityData) => void,
   onError?: (error: Event) => void
@@ -75,7 +80,6 @@ export const subscribeToNetworkActivity = (
 
   sse.onmessage = (event: MessageEvent) => {
     const parsedData = JSON.parse(event.data);
-    console.log('Received SSE data:', parsedData);
     if (parsedData.type === 'network_activity') {
       if (debounceTimeout) clearTimeout(debounceTimeout);
       debounceTimeout = setTimeout(() => {

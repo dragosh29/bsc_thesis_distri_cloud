@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { cardStyle, badgeBaseStyle } from '../styles/shared';
 import LoadingIndicator from './LoadingIndicator';
 import { NetworkActivityData } from '../types/api';
-import { subscribeToNetworkActivity } from '../services/api';
+import { fetchNetworkActivity, subscribeToNetworkActivity } from '../services/api';
 import { trustBadgeColor, trustTooltip, statusColorMap, translateTaskStatus } from '../utils/format';
 
 const defaultData: NetworkActivityData = {
@@ -22,17 +22,32 @@ const NetworkActivityCard: React.FC = () => {
   const [data, setData] = useState<NetworkActivityData>(defaultData);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const unsubscribe = subscribeToNetworkActivity(
-      (newData) => {
-        setData(newData);
+   useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
+
+    const initialize = async () => {
+      try {
+        const initialData = await fetchNetworkActivity();
+        setData(initialData);
+      } catch (error) {
+        console.error('Failed to fetch initial network activity:', error);
+      } finally {
         setIsLoading(false);
-      },
-      (error) => {
-        console.error('SSE error:', error);
       }
-    );
-    return () => unsubscribe();
+
+      unsubscribe = subscribeToNetworkActivity(
+        (newData) => setData(newData),
+        (error) => {
+          console.error('SSE error:', error);
+        }
+      );
+    };
+
+    initialize();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const trustBadgeStyle = {

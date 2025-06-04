@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from hub.models import Node, Task, TaskAssignment
 from hub.serializers import NodeSerializer, TaskSerializer, NodeRegistrationSerializer
 from hub.tasks import validate_docker_image_task
+from hub.redis_publisher import get_network_activity_data
 
 
 @api_view(['GET'])
@@ -241,6 +242,18 @@ def get_submitted_tasks(request):
     tasks = Task.objects.filter(submitted_by=node)
     serializer = TaskSerializer(tasks, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def network_activity(request):
+    """
+    API endpoint to get current network activity data.
+    """
+    data = get_network_activity_data()
+    return Response({
+        "timestamp": timezone.now().isoformat(),
+        "data": data
+    })
 
 
 def network_activity_stream():
