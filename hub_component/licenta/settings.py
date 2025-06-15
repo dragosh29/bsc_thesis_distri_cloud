@@ -182,3 +182,5 @@ TRUST_INDEX_MAX = 10.0
 
 # Orchestration algorithm: 'custom' (default) or 'fifo'
 ORCHESTRATION_MECHANISM = "custom"
+
+EXPERIMENT_MODE = True # set to True to enable experiment setup endpoints

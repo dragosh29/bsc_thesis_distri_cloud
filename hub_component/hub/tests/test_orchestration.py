@@ -15,6 +15,7 @@ from hub.tests.factories import NodeFactory, TaskFactory, TaskAssignmentFactory
 
 @pytest.mark.django_db
 class TestTaskManagerLogic:
+    """Test suite for TaskManager logic. Included prioritization, assignment, and validation."""
 
     def test_calculate_task_priority_gives_higher_score_for_older_tasks(self):
         manager = TaskManager()
@@ -71,6 +72,7 @@ class TestTaskManagerLogic:
 
 @pytest.mark.django_db
 class TestCeleryOrchestration:
+    """Test for async task orchestration and distribution."""
 
     @patch("hub.tasks.chain")
     def test_orchestrate_task_distribution_triggers_all(self, mock_chain):
@@ -81,6 +83,7 @@ class TestCeleryOrchestration:
 
 @pytest.mark.django_db
 class TestDockerValidation:
+    """Test suite for validating Docker images in tasks."""
 
     @patch("hub.task_manager.docker.DockerClient")
     def test_validate_docker_image_success(self, mock_client_class):
@@ -111,6 +114,7 @@ class TestDockerValidation:
 
 @pytest.mark.django_db
 class TestRedisSignalTriggering:
+    """Test suite for Django post_save signals triggering Redis events."""
 
     @patch("hub.signals.publish_network_activity")
     def test_post_save_triggers_publish_network_activity(self, mock_publish):
@@ -128,6 +132,7 @@ class TestRedisSignalTriggering:
 
 @pytest.mark.django_db
 class TestNodeHealthTask:
+    """Test suite for node health checks and status updates."""
 
     def test_check_node_health_marks_inactive(self):
         # Create node with dummy value first
@@ -152,6 +157,7 @@ class TestNodeHealthTask:
 
 @pytest.mark.django_db
 class TestTaskManagerExtensions:
+    """Extended tests for TaskManager logic, including edge cases and additional scenarios."""
 
     def test_calculate_priority_handles_missing_resources(self):
         task = TaskFactory(resource_requirements={})
@@ -223,6 +229,7 @@ class TestTaskManagerExtensions:
 
 @pytest.mark.django_db
 class TestCeleryEntrypoints:
+    """Test suite for Celery task entry points to ensure they execute without errors."""
 
     def test_reorder_active_queue_task_executes(self):
         from hub.tasks import reorder_active_queue_task

@@ -21,7 +21,7 @@ TRUST_RANGE = (1.0, 10.0)
 CPU_REQ_RANGE = (1, 6)
 RAM_REQ_RANGE = (1, 10)
 
-# Task "execution" time simulation (in seconds)
+# Task execution time simulation (in seconds)
 TASK_DURATION_MEAN = 1.0
 TASK_DURATION_STD = 0.1
 
@@ -30,19 +30,23 @@ OVERLAP_DIST = [1, 2, 3, 4, 5]
 OVERLAP_WEIGHTS = [0.10, 0.35, 0.35, 0.15, 0.05]  # 2/3 common, 5 rare
 
 def random_overlap():
+    """Generate a random overlap count based on predefined distribution."""
     return random.choices(OVERLAP_DIST, weights=OVERLAP_WEIGHTS, k=1)[0]
 
 def random_trust_required():
+    """Generate a random trust index required for task submission."""
     # You can tune this as desired (e.g., bias towards more realistic scenarios)
     return round(random.uniform(1.0, 10.0), 2)
 
 # ============ API HELPERS ============
 
 def set_algorithm(alg):
+    """Reminder to set the orchestration algorithm in Django settings."""
     print(f"\n*** Please ensure ORCHESTRATION_MECHANISM is set to '{alg}' and restart Django if needed! ***\n")
     input("Press Enter to continue once Django is running with the correct mode...")
 
 def register_node(name, cpu, ram, trust):
+    """Register a new node with the given resources and trust index."""
     payload = {
         "name": name,
         "ip_address": "127.0.0.1",
@@ -56,6 +60,7 @@ def register_node(name, cpu, ram, trust):
     return data
 
 def submit_task(desc, cpu, ram, overlap, submitter_id, trust_required):
+    """Submit a new task with the specified requirements and metadata."""
     payload = {
         "description": desc,
         "container_spec": {"image": "python:3.9", "command": "python main.py"},
@@ -69,18 +74,21 @@ def submit_task(desc, cpu, ram, overlap, submitter_id, trust_required):
     return res.json()["task_id"]
 
 def send_heartbeat(nid, free_resources):
+    """Send a heartbeat to the API to update node's free resources."""
     requests.post(f"{API_BASE}/nodes/heartbeat/", json={
         "node_id": nid,
         "free_resources": free_resources
     })
 
 def fetch_task(nid):
+    """Fetch a task for the given node ID."""
     res = requests.get(f"{API_BASE}/tasks/fetch", params={"node_id": nid})
     if res.status_code == 200:
         return res.json()
     return None
 
 def submit_result(tid, nid, output="ok"):
+    """Submit the result of a task execution."""
     payload = {
         "task_id": tid,
         "node_id": nid,
@@ -90,20 +98,24 @@ def submit_result(tid, nid, output="ok"):
     return res.status_code == 200
 
 def get_task_status(tid):
+    """Get the status of a specific task by its ID."""
     res = requests.get(f"{API_BASE}/tasks/{tid}/")
     return res.json() if res.status_code == 200 else None
 
 def get_all_tasks():
+    """Fetch all tasks from the API."""
     res = requests.get(f"{API_BASE}/tasks")
     res.raise_for_status()
     return res.json()
 
 def trigger_orchestration():
+    """Trigger orchestration manually to process tasks."""
     resp = requests.post(f"{API_BASE}/experiment/distribution/trigger_orchestration/", timeout=10)
     if resp.status_code != 200:
         raise Exception(f"Failed to trigger orchestration: {resp.text}")
 
 def reset_all_data():
+    """Reset the database to a clean state for the experiment."""
     resp = requests.post(f"{API_BASE}/experiment/distribution/reset_db/")
     if resp.status_code != 200:
         raise Exception("Failed to reset DB: " + resp.text)
@@ -113,6 +125,7 @@ def reset_all_data():
 
 class NodeThread(threading.Thread):
     def __init__(self, node_info, experiment_queue, result_log, stop_flag):
+        """Initialize the node thread with its info and queues."""
         super().__init__()
         self.node = node_info
         self.nid = self.node["id"]
@@ -124,6 +137,7 @@ class NodeThread(threading.Thread):
         self.stop_flag = stop_flag
 
     def run(self):
+        """Run the node thread to fetch and process tasks."""
         while not self.stop_flag.is_set():
             send_heartbeat(self.nid, {"cpu": self.cpu, "ram": self.ram})
             task = fetch_task(self.nid)
@@ -147,6 +161,7 @@ class NodeThread(threading.Thread):
 # ============ EXPERIMENT RUNNER ============
 
 def run_experiment(algorithm, N, M):
+    """Run a single experiment with the specified algorithm, N nodes, and M tasks."""
     print(f"\n=== Running experiment: {algorithm.upper()}, N={N}, M={M} ===")
 
     set_algorithm(algorithm)
@@ -171,7 +186,7 @@ def run_experiment(algorithm, N, M):
     for i in range(M):
         cpu_req = random.randint(*CPU_REQ_RANGE)
         ram_req = random.randint(*RAM_REQ_RANGE)
-        # --- Guarantee: overlap/trust_required is always possible given nodes
+        # --- Guarantee: overlap/trust_required is always possible with the given nodes
         while True:
             overlap = random_overlap()
             trust_required = min(random_trust_required(), max_trust)  # <=== HARD CAP
@@ -193,8 +208,7 @@ def run_experiment(algorithm, N, M):
     for t in threads:
         t.start()
 
-    # 4. Poll until all tasks are validated or failed,
-    #    and retrigger orchestration at each poll ("manual beat")
+    # 4. Poll until all tasks are validated or failed and retrigger orchestration at each poll ("manual beat")
     task_status = {tid: {"validated": False, "failed": False} for tid in task_ids}
     start_time = time.time()
     stale_counts = {}
@@ -209,7 +223,7 @@ def run_experiment(algorithm, N, M):
                 finished += 1
                 task_status[tid]["validated"] = tstat["status"] == "validated"
                 task_status[tid]["failed"] = tstat["status"] == "failed"
-        trigger_orchestration()   # Manual beat
+        trigger_orchestration() # manual beat
         if finished == M:
             break
         time.sleep(3)
@@ -255,7 +269,6 @@ if __name__ == "__main__":
                 results = run_experiment(alg, N, M)
                 all_results.extend(results)
 
-    # Save results
     df = pd.DataFrame(all_results)
     df.to_csv("node_distribution_experiment_results.csv", index=False)
     print("\nAll experiments done. Results saved to node_distribution_experiment_results.csv.")

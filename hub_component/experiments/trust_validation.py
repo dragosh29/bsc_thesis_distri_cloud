@@ -28,6 +28,11 @@ ALL_NODE_NAMES = list(RESULT_MAPPING.keys())
 
 class ValidationExperimentApp:
     def __init__(self, root):
+        """
+        Initialize the validation experiment application.
+        Args: root (tk.Tk): The root window for the application.
+        """
+
         self.root = root
         self.root.title("Trust Validation Experiment")
 
@@ -78,6 +83,8 @@ class ValidationExperimentApp:
 
 
     def _make_widgets(self):
+        """Create the main widgets for the application."""
+
         self.setup_btn = ttk.Button(self.frame, text="1. Setup Experiment", command=self.setup_experiment)
         self.setup_btn.grid(row=1, column=0, columnspan=2, sticky="ew", pady=2)
 
@@ -99,12 +106,18 @@ class ValidationExperimentApp:
 
 
     def _make_canvas(self):
+        """Create the matplotlib canvas for drawing the graph."""
+
         self.fig, self.ax = plt.subplots(figsize=(8,8), constrained_layout=True)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.frame)
         w = self.canvas.get_tk_widget()
         w.grid(row=0, column=2, rowspan=8, sticky="nsew", padx=10, pady=10)
 
     def draw_graph(self):
+        """
+        Draw the graph representing the trust validation experiment (nodes, tasks, results).
+        Each call to this method will redraw the graph based on the current internal state.
+        """
         import numpy as np
 
         self.ax.clear()
@@ -211,6 +224,7 @@ class ValidationExperimentApp:
 
 
     def setup_experiment(self):
+        """Setup by calling the API to create nodes and tasks."""
         try:
             resp = requests.post(SETUP_URL, timeout=10, data={"trust_low": TRUST_LOW, "trust_high": TRUST_HIGH})
             if resp.status_code != 201:
@@ -227,6 +241,7 @@ class ValidationExperimentApp:
             messagebox.showerror("API Error", f"Failed to setup experiment:\n{e}")
 
     def start_keepalive(self):
+        """Start the keep-alive thread to send heartbeats."""
         if self.keepalive_running:
             return
         self.keepalive_running = True
@@ -236,6 +251,7 @@ class ValidationExperimentApp:
         self.keepalive_thread.start()
 
     def keep_nodes_alive_loop(self):
+        """Keep-alive loop that sends heartbeats to the API every 60 seconds."""
         while self.keepalive_running:
             try:
                 resp = requests.post(KEEPALIVE_URL, json={"node_names": ALL_NODE_NAMES}, timeout=5)
@@ -246,6 +262,7 @@ class ValidationExperimentApp:
             time.sleep(60)
 
     def check_assignments(self):
+        """Fetch the task assignments from the API and update the internal state."""
         if not self.task_id:
             messagebox.showerror("Input Error", "No Task ID set!")
             return
@@ -266,6 +283,7 @@ class ValidationExperimentApp:
             messagebox.showerror("API Error", f"Error fetching assignments:\n{e}")
 
     def submit_results(self):
+        """Submit the results for each node based on the predefined mapping."""
         self.result_edges = []
         errors = []
         for name, result in RESULT_MAPPING.items():
@@ -294,6 +312,7 @@ class ValidationExperimentApp:
         self.draw_graph()
 
     def show_final_result(self):
+        """Fetch the final result from the API and update the status bar."""
         try:
             resp = requests.get(TASK_URL(self.task_id), timeout=10)
             if resp.status_code != 200:

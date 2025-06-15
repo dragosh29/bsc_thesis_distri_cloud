@@ -6,11 +6,13 @@ from utils import get_node_resources, get_node_availability
 logging.basicConfig(level=logging.INFO)
 
 class APIClient:
+    """Client for interacting with the hub API to register the node, fetch tasks, and submit results."""
     def __init__(self):
         self.base_url = HUB_API_BASE_URL
         self.node_id = get_node_id()
 
     def register_node(self, node_name):
+        """Registers the node with the hub API and returns the node ID."""
         if self.node_id:
             print(f"[API CLIENT] Node already registered with ID: {self.node_id}")
             logging.info(f"Node already registered with ID: {self.node_id}")
@@ -33,18 +35,21 @@ class APIClient:
         return response_data
 
     def fetch_task(self):
+        """Fetches a task from the hub API for the registered node."""
         if not self.node_id:
             raise Exception("[API CLIENT] Node ID is missing. Register the node first.")
         response = requests.get(f"{self.base_url}/tasks/fetch", params={"node_id": self.node_id})
         return response.json()
 
     def fetch_task_details(self, task_id):
+        """Fetches details of a specific task assigned to the node."""
         if not self.node_id:
             raise Exception("[API CLIENT] Node ID is missing. Cannot query task assignment details.")
         response = requests.get(f"{self.base_url}/tasks/{task_id}", params={"node_id": self.node_id})
         return response.json()
 
     def send_heartbeat(self):
+        """Sends a heartbeat signal to the hub API to update node availability."""
         if not self.node_id:
             raise Exception("[API CLIENT] Node ID is missing. Register the node first.")
         resources = get_node_availability()
@@ -53,6 +58,7 @@ class APIClient:
         return response.json()
 
     def submit_result(self, task_id, result):
+        """Submits the result of a completed task to the hub API."""
         if not self.node_id:
             raise Exception("[API CLIENT] Node ID is missing. Register the node first.")
         payload = {

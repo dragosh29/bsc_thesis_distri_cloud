@@ -14,7 +14,6 @@ def mock_api_client():
 def test_heartbeat_runs_once_and_calls_send(mock_sleep, mock_api_client):
     heartbeat = Heartbeat(mock_api_client)
 
-    # Use a side effect to stop after 1 iteration
     def stop_after_one(*args, **kwargs):
         heartbeat.should_run = False  # stop loop after first call
         return None

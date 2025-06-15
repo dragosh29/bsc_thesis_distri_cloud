@@ -13,6 +13,7 @@ from hub.serializers import NodeSerializer, TaskSerializer, NodeRegistrationSeri
 from hub.tasks import validate_docker_image_task
 from hub.redis_publisher import get_network_activity_data
 from hub.tasks import orchestrate_task_distribution
+from hub.utils import experiment_mode_required
 
 
 @api_view(['GET'])
@@ -139,7 +140,6 @@ def submit_task_result(request):
 def node_heartbeat(request):
     """
     Endpoint for nodes to send periodic heartbeats and resource availability updates.
-    We do not mark nodes as failed; only tasks can fail.
     """
     node_id = request.data.get('node_id')
     free_resources = request.data.get('free_resources')
@@ -166,7 +166,7 @@ def node_heartbeat(request):
 @api_view(['POST'])
 def submit_task(request):
     """
-    Submit a task and queue it for Docker image validation.
+    Submit a task and trigger Docker image validation in Celery worker.
     """
     submitted_by = request.data.get('submitted_by')
     if not submitted_by:
@@ -265,6 +265,7 @@ def network_activity(request):
 
 
 def network_activity_stream():
+    """Generator function to stream network activity data via Server-Sent Events (SSE)."""
     redis_client = redis.StrictRedis.from_url(settings.CELERY_BROKER_URL)
     pubsub = redis_client.pubsub()
     pubsub.subscribe(settings.REDIS_NETWORK_ACTIVITY_CHANNEL)
@@ -278,6 +279,7 @@ def network_activity_stream():
 
 
 def task_update_stream(node_id):
+    """Generator function to stream task updates for a specific node via Server-Sent Events (SSE)."""
     redis_client = redis.StrictRedis.from_url(settings.CELERY_BROKER_URL)
     pubsub = redis_client.pubsub()
     channel = settings.REDIS_TASK_UPDATES_CHANNEL
@@ -292,6 +294,7 @@ def task_update_stream(node_id):
 
 
 def sse_network_activity(request):
+    """ Endpoint to stream network activity data via Server-Sent Events (SSE)."""
     response = StreamingHttpResponse(network_activity_stream(), content_type='text/event-stream')
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
@@ -302,6 +305,7 @@ def sse_network_activity(request):
 
 
 def sse_task_updates(request):
+    """ Endpoint to stream task updates for a specific node via Server-Sent Events (SSE)."""
     node_id = request.GET.get('node_id')
     if not node_id:
         return StreamingHttpResponse(
@@ -320,6 +324,7 @@ def sse_task_updates(request):
 
 
 @api_view(['POST'])
+@experiment_mode_required
 def validation_experiment_setup(request):
     """
     Endpoint to run the trust validation experiment.
@@ -363,6 +368,7 @@ def validation_experiment_setup(request):
 
 
 @api_view(['POST'])
+@experiment_mode_required
 def validation_experiment_keep_nodes_alive(request):
     """
     Endpoint to keep nodes alive for the validation experiment.
@@ -384,6 +390,7 @@ def validation_experiment_keep_nodes_alive(request):
 
 
 @api_view(['POST'])
+@experiment_mode_required
 def distribution_experiment_trigger_orchestration(request):
     """
     Endpoint to trigger the orchestration of nodes for the distribution experiment.
@@ -395,6 +402,7 @@ def distribution_experiment_trigger_orchestration(request):
 
 
 @api_view(['POST'])
+@experiment_mode_required
 def distribution_experiment_create_node(request):
     """
     Create a node with explicit trust index and resources (for experiment reproducibility).
@@ -418,6 +426,7 @@ def distribution_experiment_create_node(request):
 
 
 @api_view(['POST'])
+@experiment_mode_required
 def distribution_experiment_reset_db(request):
     """
     Deletes all Nodes, Tasks, TaskAssignments, and Heartbeats for a clean experiment slate.

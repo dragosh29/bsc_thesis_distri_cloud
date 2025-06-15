@@ -6,6 +6,9 @@ from hub.redis_publisher import publish_network_activity, publish_task_update
 
 @receiver(pre_save, sender=Node)
 def cache_old_node_status(sender, instance, **kwargs):
+    """
+    Cache the old status of a Node instance before saving.
+    """
     if instance.pk:
         try:
             old_instance = Node.objects.get(pk=instance.pk)
@@ -17,11 +20,13 @@ def cache_old_node_status(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Node)
 def emit_network_activity_on_node_update(sender, instance, created, **kwargs):
+    """Emit network activity if the node status has changed or if it's a new node."""
     if created or instance._old_status != instance.status:
         publish_network_activity()
 
 @receiver(pre_save, sender=Task)
 def cache_old_task_status(sender, instance, **kwargs):
+    """Cache the old status of a Task instance before saving."""
     if instance.pk:
         try:
             old_instance = Task.objects.get(pk=instance.pk)
@@ -33,6 +38,7 @@ def cache_old_task_status(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Task)
 def emit_network_activity_on_task_update(sender, instance, created, **kwargs):
+    """Emit network activity if the task status has changed or if it's a new task."""
     if created or instance._old_status != instance.status:
         publish_network_activity()
         if instance.submitted_by:

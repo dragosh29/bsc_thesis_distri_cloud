@@ -2,6 +2,7 @@ import subprocess
 from api_client import APIClient
 
 class TaskExecutor:
+    """Manages the blind execution of tasks on the local worker node using Docker."""
     def __init__(self):
         self.api_client = APIClient()
 
@@ -39,6 +40,8 @@ class TaskExecutor:
                 raise Exception("Docker installation failed. Please check the logs and try again.")
 
     def execute_task(self, task):
+        """Execute a task by pulling the Docker image and running the specified command."""
+
         task_id = task['id']
         container_spec = task.get('container_spec', {})
         image = container_spec.get('image', "")

@@ -1,8 +1,9 @@
 from rest_framework import serializers
-from hub.models import Node, Task, TaskAssignment
+from hub.models import Node, Task
 
 
 class NodeSerializer(serializers.ModelSerializer):
+    """Serializer for Node model."""
     class Meta:
         model = Node
         fields = '__all__'
@@ -28,6 +29,7 @@ class NodeRegistrationSerializer(serializers.Serializer):
 
 
 class TaskSerializer(serializers.ModelSerializer):
+    """Serializer for Task model."""
     class Meta:
         model = Task
         fields = '__all__'

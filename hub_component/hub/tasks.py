@@ -12,12 +12,11 @@ from hub.task_manager import TaskManager, logger
 def check_node_health():
     """
     Periodically checks node heartbeats and updates their status based on inactivity.
-    - Any 'active' node that hasn't had a heartbeat in the last 1 minute becomes 'inactive'.
+    - Any 'active' node that hasn't had a heartbeat in the last 2 minutes becomes 'inactive'.
     - Delegates task handling logic to TaskManager.
     """
-    threshold_inactive = timezone.now() - timedelta(minutes=1)
+    threshold_inactive = timezone.now() - timedelta(minutes=2)
 
-    # Mark active nodes as inactive if they haven't sent a heartbeat in 5+ minutes
     inactive_nodes = Node.objects.filter(
         Q(
         last_heartbeat__lt=threshold_inactive,
@@ -39,42 +38,49 @@ def check_node_health():
 
 @shared_task
 def reorder_active_queue_task(*args, **kwargs):
+    """Celery task to reorder the active task queue. Delegates to TaskManager."""
     manager = TaskManager()
     manager.reorder_active_queue()
 
 
 @shared_task
 def handle_stale_tasks_task(*args, **kwargs):
+    """Celery task to handle stale tasks. Delegates to TaskManager."""
     manager = TaskManager()
     manager.handle_stale_tasks()
 
 
 @shared_task
 def move_tasks_to_active_queue_task(*args, **kwargs):
+    """Celery task to move tasks from the pending queue to the active queue. Delegates to TaskManager."""
     manager = TaskManager()
     manager.move_tasks_to_active_queue()
 
 
 @shared_task
 def assign_tasks_to_nodes_task(*args, **kwargs):
+    """Celery task to assign tasks to nodes. Delegates to TaskManager."""
     manager = TaskManager()
     manager.assign_tasks_to_nodes()
 
 
 @shared_task
 def retry_failed_tasks_task(*args, **kwargs):
+    """Celery task to retry failed tasks. Delegates to TaskManager."""
     manager = TaskManager()
     manager.retry_failed_tasks()
 
 
 @shared_task
 def handle_persistently_failing_tasks_task(*args, **kwargs):
+    """Celery task to handle persistently failing tasks. Delegates to TaskManager."""
     manager = TaskManager()
     manager.handle_persistently_failing_tasks()
 
 
 @shared_task
 def validate_docker_image_task(task_id):
+    """ Celery task to validate a Docker image for a given task ID. Delegates to TaskManager."""
     manager = TaskManager()
     status = manager.validate_docker_image(task_id)
     if 'error' in status:
@@ -100,9 +106,7 @@ def orchestrate_task_distribution():
         handle_persistently_failing_tasks_task.s()
     )
 
-    # Orchestration workflow
+    # Trigger the workflow
     workflow = chain(parallel_tasks, sequential_tasks)
-
-    # Execute asynchronously
     workflow.apply_async()
     logger.info("[orchestrate_task_distribution] Task distribution workflow initiated.")

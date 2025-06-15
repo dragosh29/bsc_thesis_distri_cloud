@@ -1,8 +1,6 @@
-# task_manager.py
-
 import logging
 import docker
-from docker.errors import ImageNotFound, APIError, DockerException
+from docker.errors import ImageNotFound, DockerException
 from collections import defaultdict
 
 from django.utils import timezone
@@ -19,17 +17,14 @@ class TaskManager:
     """
     Manages task distribution among nodes using an active queue + backlog strategy,
     resource-aware assignment, trust index filtering, and staleness logic.
-
-    NOTE: Tasks already assigned to nodes are not swapped out of the active queue.
     """
 
     def __init__(self):
-        # The maximum number of tasks to keep 'in_progress' at once
         self.active_queue_size = getattr(settings, 'ACTIVE_QUEUE_SIZE', 10)
-        # Stale tasks threshold
         self.max_stale_count = MAX_STALE_COUNT
 
     def select_tasks_to_activate(self, backlog_tasks, available_slots):
+        """Selects tasks from the backlog to activate based on priority / use FiFo."""
         mechanism = getattr(settings, "ORCHESTRATION_MECHANISM", "custom")
         if mechanism == "fifo":
             return list(backlog_tasks.order_by("created_at")[:available_slots])
@@ -39,7 +34,7 @@ class TaskManager:
 
     def calculate_task_priority(self, task: Task) -> float:
         """
-        Calculates a numeric priority score for a given task.
+        Calculates a numeric priority score for a given task using heuristic.
         Higher -> higher priority to schedule.
         """
         # Age factor: the longer it has waited, the more urgent
@@ -79,6 +74,7 @@ class TaskManager:
         """
         Swap tasks from the active queue with backlog tasks if the latter have higher priority,
         but only if the active tasks are unassigned. (We do not swap tasks that already started.)
+        Don't swap tasks if impact is minimal (30% threshold).
         """
         active_tasks_unassigned = list(
             Task.objects.filter(
@@ -116,7 +112,6 @@ class TaskManager:
         active_tasks = Task.objects.filter(Q(status='in_progress') | Q(status='in_queue'))
 
         for task in active_tasks:
-            # Get currently assigned node IDs
             assigned_nodes = set(
                 TaskAssignment.objects.filter(task=task).values_list('node_id', flat=True)
             )
@@ -142,8 +137,8 @@ class TaskManager:
                 # Assign nodes just in DB-order (FIFO, no ranking)
                 ranked_nodes = list(candidate_nodes.order_by("last_heartbeat"))
             else:
-                # Calculate suitability score for each node
                 def calculate_suitability(node):
+                    """Compute suitability score based on resource availability and match with task requirements."""
                     node_free_cpu = node.free_resources.get('cpu', 0)
                     node_free_ram = node.free_resources.get('ram', 0)
 
@@ -153,7 +148,7 @@ class TaskManager:
                     cpu_score = abs(node_free_cpu - task_cpu) / max(task_cpu, 1)
                     ram_score = abs(node_free_ram - task_ram) / max(task_ram, 1)
 
-                    return cpu_score + ram_score  # Lower is better
+                    return cpu_score + ram_score  # lower is better
 
                 # Rank nodes by suitability and fallback to trust index
                 ranked_nodes = sorted(
@@ -248,7 +243,7 @@ class TaskManager:
             logger.warning(f"[VALIDATION] Task {task_id} is not completed yet.")
             return False
 
-        # Aggregate results from task assignments
+        # aggregate results from task assignments
         assignments = TaskAssignment.objects.filter(task=task, completed_at__isnull=False)
         if assignments.count() < task.overlap_count:
             logger.warning("Not all assignments are completed yet.")
@@ -275,7 +270,7 @@ class TaskManager:
         total_weight = sum(result_weights.values())
 
         # Determine if the result passes the validation threshold
-        validation_threshold = VALIDATION_THRESHOLD  # 60% trust weight threshold
+        validation_threshold = VALIDATION_THRESHOLD
         if max_weight / total_weight >= validation_threshold:
             task.result = {"validated_output": validated_result, "trust_score": max_weight / total_weight * 10}
             task.status = 'validated'
@@ -309,7 +304,7 @@ class TaskManager:
         # Fetch tasks that are marked as 'failed' and haven't exceeded retry limits
         retryable_tasks = Task.objects.filter(
             status='failed',
-            stale_count__lt=self.max_stale_count  # Ensure we don't retry tasks indefinitely
+            stale_count__lt=self.max_stale_count  # ensure we dont retry tasks indefinitely
         )
 
         if not retryable_tasks.exists():
@@ -368,7 +363,6 @@ class TaskManager:
                     registry=credentials.get('registry', 'https://index.docker.io/v1/')
                 )
 
-            # Try pulling the image
             client.images.pull(image)
             task.status = 'pending'
             task.save()

@@ -6,6 +6,7 @@ class Heartbeat:
         self.should_run = False
 
     def start(self):
+        """Start the heartbeat process to periodically notify the API that the node is active."""
         self.should_run = True
         while self.should_run:
             try:
@@ -16,5 +17,6 @@ class Heartbeat:
             time.sleep(30)
 
     def stop(self):
+        """Stop the heartbeat process."""
         print("[HEARTBEAT] Stopping heartbeat...")
         self.should_run = False

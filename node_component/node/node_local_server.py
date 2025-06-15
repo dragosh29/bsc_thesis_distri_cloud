@@ -11,6 +11,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
+# Flask app to act as HTTP bridge between the local node executor and the frontend
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:18080"}})
 
@@ -19,6 +20,7 @@ node_manager = NodeManager()
 
 @app.route('/api/node', methods=['GET'])
 def get_node_status():
+    """Returns the status of the node, including whether it is registered, running, and its resource usage."""
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, 'r') as f:
             config = json.load(f)
@@ -41,6 +43,7 @@ def get_node_status():
 
 @app.route('/api/node/register', methods=['POST'])
 def register_node():
+    """Exposes registration for the node. Delegates the registration process to NodeManager."""
     data = request.json
     node_name = data.get('name')
     logging.info(f"Registering Node with name: {node_name}")
@@ -57,6 +60,7 @@ def register_node():
 
 @app.route('/api/node/start', methods=['POST'])
 def start_node():
+    """Exposes the runtime toggle for the local node worker. Delegates the start process to NodeManager."""
     try:
         node_manager.start()
         return jsonify({"message": "Node Manager started successfully."}), 200
@@ -65,6 +69,7 @@ def start_node():
 
 @app.route('/api/node/stop', methods=['POST'])
 def stop_node():
+    """Exposes the runtime toggle for the local node worker. Delegates the stop process to NodeManager."""
     try:
         node_manager.stop()
         return jsonify({"message": "Node Manager stopped successfully."}), 200

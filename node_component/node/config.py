@@ -1,4 +1,3 @@
-# config.py
 import json
 import os
 

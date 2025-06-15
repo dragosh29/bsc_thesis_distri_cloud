@@ -16,9 +16,9 @@ def get_node_resources():
 def get_node_availability(interval=2):
     """
     Returns the current resource usage/availability in terms of CPU cores and available RAM (GB).
-    Usage is measured over a specified time interval (in seconds).
+    Usage is measured over the time interval specified in param: interval (in seconds).
     """
-    # Measure CPU usage per core
+    # CPU usage per core
     usage_per_core_percent = psutil.cpu_percent(interval=interval, percpu=True)
     total_cores = len(usage_per_core_percent)
 
@@ -26,7 +26,6 @@ def get_node_availability(interval=2):
     used_cores = sum((usage / 100.0) for usage in usage_per_core_percent)
     available_cores = total_cores - used_cores
 
-    # Memory
     mem_info = psutil.virtual_memory()
     ram_available_gb = round(mem_info.available / (1024 ** 3), 2)
 
@@ -36,5 +35,6 @@ def get_node_availability(interval=2):
     }
 
 def get_ip_address():
+    """Returns the IP address of the node."""
     import socket
     return socket.gethostbyname(socket.gethostname())

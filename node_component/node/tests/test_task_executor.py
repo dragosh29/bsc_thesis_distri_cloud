@@ -12,8 +12,8 @@ def task_executor():
 
 
 @pytest.mark.parametrize("status_code,stdout,stderr", [
-    (0, "Task ran", ""),               # Success case
-    (1, "", "Some error")              # Failure case
+    (0, "Task ran", ""), # success case
+    (1, "", "Some error" # failure case
 ])
 def test_execute_task_basic_flow(task_executor, status_code, stdout, stderr):
     task = {
@@ -30,7 +30,7 @@ def test_execute_task_basic_flow(task_executor, status_code, stdout, stderr):
         }
     }
 
-    # Control subprocess behavior
+    # control subprocess behavior
     mock_completed = MagicMock()
     mock_completed.returncode = status_code
     mock_completed.stdout = stdout
@@ -41,10 +41,9 @@ def test_execute_task_basic_flow(task_executor, status_code, stdout, stderr):
 
         task_executor.execute_task(task)
 
-        # Validate subprocess command calls
+        # validate subprocess command calls
         assert mock_run.call_count >= 3  # login, pull, run, logout
 
-        # Validate result submission
         mock_submit.assert_called_once()
         args = mock_submit.call_args[0]
         assert args[0] == "task123"
@@ -88,7 +87,7 @@ def test_ensure_docker_installed_success():
 
 def test_ensure_docker_installed_triggers_install():
     with patch("task_executor.subprocess.run") as mock_run:
-        # First call fails → triggers install
+        # first call fails → triggers install
         mock_run.side_effect = [subprocess.CalledProcessError(1, "docker --version"), MagicMock()]
         executor = TaskExecutor()
         executor.ensure_docker_installed()

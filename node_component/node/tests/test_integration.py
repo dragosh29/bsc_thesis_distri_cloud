@@ -17,14 +17,10 @@ def test_node_manager_start_runs_heartbeat_and_task_loop():
         manager = NodeManager()
         manager.node_id = "node-abc"  # simulate already registered
 
-        # Start node manager in a thread to test async behavior
+        # start node manager in a thread to test async behavior
         thread = threading.Thread(target=manager.start)
         thread.start()
-
-        # Let the loop run a bit
         time.sleep(2)
-
-        # Stop manager
         manager.stop()
         thread.join(timeout=3)
 
@@ -43,14 +39,12 @@ def test_flask_register_and_start_flow():
         mock_register.return_value = True
         mock_start.return_value = None
 
-        # Call register
         response = client.post("/api/node/register", json={"name": "integration-node"})
         assert response.status_code == 200
         data = response.get_json()
         assert "message" in data
         mock_register.assert_called_once_with("integration-node")
 
-        # Call start
         response = client.post("/api/node/start")
         assert response.status_code == 200
         assert "message" in response.get_json()

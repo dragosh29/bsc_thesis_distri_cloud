@@ -34,6 +34,7 @@ def get_network_activity_data():
 def publish_task_update(node_id, emit=False):
     """
     Publish a task update event to the Redis channel.
+    Args: node_id (UUID): The ID of the node that is being updated.
     """
     if not emit:
         return

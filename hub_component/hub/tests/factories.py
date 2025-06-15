@@ -5,6 +5,7 @@ from hub.models import Node, Task, TaskAssignment, Heartbeat
 
 
 class NodeFactory(factory.django.DjangoModelFactory):
+    """Factory for creating Node instances for testing."""
     class Meta:
         model = Node
 
@@ -19,6 +20,7 @@ class NodeFactory(factory.django.DjangoModelFactory):
 
 
 class TaskFactory(factory.django.DjangoModelFactory):
+    """Factory for creating Task instances for testing."""
     class Meta:
         model = Task
 
@@ -32,6 +34,7 @@ class TaskFactory(factory.django.DjangoModelFactory):
 
 
 class TaskAssignmentFactory(factory.django.DjangoModelFactory):
+    """Factory for creating TaskAssignment instances for testing."""
     class Meta:
         model = TaskAssignment
 
@@ -41,6 +44,7 @@ class TaskAssignmentFactory(factory.django.DjangoModelFactory):
 
 
 class HeartbeatFactory(factory.django.DjangoModelFactory):
+    """Factory for creating Heartbeat instances for testing."""
     class Meta:
         model = Heartbeat
 

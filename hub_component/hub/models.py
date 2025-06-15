@@ -1,5 +1,3 @@
-# models.py
-
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
@@ -31,7 +29,7 @@ class Node(models.Model):
         validators=[MinValueValidator(0.0), MaxValueValidator(10.0)]
     )  # 0 (untrusted) to 10 (fully trusted)
 
-    # Resource capacity (static or semi-static info)
+    # Resource capacity (static info)
     resources_capacity = models.JSONField(
         default=dict
         # Example: {

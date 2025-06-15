@@ -1,5 +1,3 @@
-# main.py
-
 from node_manager import NodeManager
 
 if __name__ == "__main__":

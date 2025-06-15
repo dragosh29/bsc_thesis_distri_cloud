@@ -8,6 +8,7 @@ from hub.tests.factories import NodeFactory, TaskFactory, TaskAssignmentFactory,
 
 @pytest.mark.django_db
 class TestNodeModel:
+    """Tests for Node model level logic. Uses freezegun to control time."""
 
     def test_is_available_for_task_true(self):
         node = NodeFactory(free_resources={"cpu": 4, "ram": 8})
@@ -41,6 +42,7 @@ class TestNodeModel:
 
 @pytest.mark.django_db
 class TestTaskModel:
+    """Tests for Task model level logic."""
 
     def test_mark_stale_increments_counter(self):
         task = TaskFactory(stale_count=0)
@@ -67,6 +69,7 @@ class TestTaskModel:
 
 @pytest.mark.django_db
 class TestTaskAssignmentModel:
+    """Tests for TaskAssignment model level logic."""
 
     def test_str_representation(self):
         assignment = TaskAssignmentFactory()
@@ -77,6 +80,7 @@ class TestTaskAssignmentModel:
 
 @pytest.mark.django_db
 class TestHeartbeatModel:
+    """Tests for Heartbeat model level logic."""
 
     def test_update_node_status_healthy(self):
         node = NodeFactory(status="inactive")

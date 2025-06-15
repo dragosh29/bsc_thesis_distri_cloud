@@ -10,6 +10,7 @@ from hub.models import Node, TaskAssignment
 
 @pytest.mark.django_db
 class TestNodeAPI:
+    """Test cases for Node API endpoints including registration and fetching."""
 
     def setup_method(self):
         self.client = APIClient()
@@ -42,12 +43,13 @@ class TestNodeAPI:
         assert response.data["id"] == str(node.id)
 
     def test_fetch_node_invalid(self):
-        response = self.client.get(reverse("fetch_node", kwargs={"node_id": "00000000-0000-0000-0000-000000000000"}))
+        response = self.client.get(reverse("fetch_node", kwargs={"node_id": "00000000-0000-0000-0000-000000000000"})) # invalid UUID
         assert response.status_code == 404
 
 
 @pytest.mark.django_db
 class TestHeartbeatAPI:
+    """Test cases for Node heartbeat API endpoint."""
 
     def setup_method(self):
         self.client = APIClient()
@@ -69,13 +71,14 @@ class TestHeartbeatAPI:
 
     def test_heartbeat_node_not_found(self):
         response = self.client.post(reverse("node_heartbeat"), data={
-            "node_id": "00000000-0000-0000-0000-000000000000"
+            "node_id": "00000000-0000-0000-0000-000000000000" # invalid UUID
         }, format="json")
         assert response.status_code == 404
 
 
 @pytest.mark.django_db
 class TestTaskAPI:
+    """Test cases for Task API endpoints including task submission and fetching."""
 
     def setup_method(self):
         self.client = APIClient()
@@ -137,6 +140,7 @@ class TestTaskAPI:
 
 @pytest.mark.django_db
 class TestTaskAssignmentAPI:
+    """Test cases for Task Assignment API endpoints including fetching and submitting task results."""
 
     def setup_method(self):
         self.client = APIClient()
@@ -204,6 +208,7 @@ class TestTaskAssignmentAPI:
 
 @pytest.mark.django_db
 class TestTaskQueries:
+    """Test cases for Task endpoints used by the frontend to fetch submitted tasks."""
 
     def setup_method(self):
         self.client = APIClient()
@@ -226,6 +231,7 @@ class TestTaskQueries:
 
 @pytest.mark.django_db
 class TestNetworkActivity:
+    """Test cases for Network Activity API endpoint."""
 
     def setup_method(self):
         self.client = APIClient()
@@ -239,6 +245,7 @@ class TestNetworkActivity:
 
 @pytest.mark.django_db
 class TestSSEViews:
+    """Test cases for Server-Sent Events (SSE) endpoints."""
 
     def setup_method(self):
         self.client = APIClient()

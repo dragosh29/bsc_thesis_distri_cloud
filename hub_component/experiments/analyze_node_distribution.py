@@ -1,8 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import os
 
 def analyze_node_distribution_results(csv_path, output_prefix="execution_analysis"):
+    """Analyze the results of a node distribution experiment from a CSV file."""
     try:
         df = pd.read_csv(csv_path, parse_dates=['assigned_at', 'completed_at'])
     except Exception as e:
@@ -66,4 +66,5 @@ def analyze_node_distribution_results(csv_path, output_prefix="execution_analysi
     return summary
 
 if __name__ == "__main__":
+    # set the path to your CSV file here. example usage:
     analyze_node_distribution_results("node_distribution_experiment_results_1.csv")
