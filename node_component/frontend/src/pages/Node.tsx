@@ -9,6 +9,7 @@ import { buttonStyle, containerStyle } from '../styles/shared';
 import { trustTooltip, trustBadgeColor } from '../utils/format';
 import NetworkActivityCard from '../components/NetworkActivityCard';
 import { Link } from 'react-router-dom';
+import LoadingIndicator from '../components/LoadingIndicator';
 
 const Node: React.FC = () => {
   const [nodeName, setNodeName] = useState<string>('');
@@ -20,6 +21,7 @@ const Node: React.FC = () => {
     isRegistering,
     isStarting,
     isStopping,
+    isLoading,
     handleRegisterNode,
     handleStartNode,
     handleStopNode,
@@ -86,7 +88,9 @@ const Node: React.FC = () => {
         Node Management
       </h1>
       
-      {nodeConfig?.status === 'registered' && fullNode ? (
+      {isLoading ? (
+        <LoadingIndicator message="Fetching node info..." />
+      ) : nodeConfig?.status === 'registered' && fullNode ? (
         <div
         style={{
           display: 'flex',
