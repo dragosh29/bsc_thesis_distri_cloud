@@ -29,6 +29,14 @@ class TaskManager:
         # Stale tasks threshold
         self.max_stale_count = MAX_STALE_COUNT
 
+    def select_tasks_to_activate(self, backlog_tasks, available_slots):
+        mechanism = getattr(settings, "ORCHESTRATION_MECHANISM", "custom")
+        if mechanism == "fifo":
+            return list(backlog_tasks.order_by("created_at")[:available_slots])
+        else:
+            sorted_backlog = sorted(backlog_tasks, key=self.calculate_task_priority, reverse=True)
+            return sorted_backlog[:available_slots]
+
     def calculate_task_priority(self, task: Task) -> float:
         """
         Calculates a numeric priority score for a given task.
@@ -37,7 +45,7 @@ class TaskManager:
         # Age factor: the longer it has waited, the more urgent
         time_waiting = (timezone.now() - task.created_at).total_seconds()
         # If no resource requirements, use 1 so we don't divide by zero
-        resource_weight = task.resource_requirements.get("cpu_cores", 0.5) + task.resource_requirements.get("ram_gb",
+        resource_weight = task.resource_requirements.get("cpu", 0.5) + task.resource_requirements.get("ram",
                                                                                                             0.5) / 2
         # Give a penalty for tasks that have gone stale multiple times
         stale_penalty = task.stale_count * STALE_PENALTY_MULTIPLIER
@@ -59,8 +67,7 @@ class TaskManager:
             return
 
         backlog_tasks = Task.objects.filter(status='pending')
-        sorted_backlog = sorted(backlog_tasks, key=self.calculate_task_priority, reverse=True)
-        tasks_to_activate = sorted_backlog[:available_slots]
+        tasks_to_activate = self.select_tasks_to_activate(backlog_tasks, available_slots)
 
         for task in tasks_to_activate:
             task.status = 'in_queue'
@@ -88,7 +95,7 @@ class TaskManager:
         lowest_active = active_sorted[-1]
         highest_backlog = backlog_sorted[0]
 
-        if self.calculate_task_priority(highest_backlog) > self.calculate_task_priority(lowest_active):
+        if self.calculate_task_priority(highest_backlog) > self.calculate_task_priority(lowest_active) * 1.3: # 30% threshold to prevent minimal impact swapping
             lowest_active.status = 'pending'
             lowest_active.save()
             highest_backlog.status = 'in_queue'
@@ -105,6 +112,7 @@ class TaskManager:
         Assign tasks in 'in_progress' and 'in_queue' state using TaskAssignment for overlap_count nodes.
         Prevents duplicate assignment of the same task to the same node.
         """
+        mechanism = getattr(settings, "ORCHESTRATION_MECHANISM", "custom")
         active_tasks = Task.objects.filter(Q(status='in_progress') | Q(status='in_queue'))
 
         for task in active_tasks:
@@ -130,24 +138,28 @@ class TaskManager:
                 logger.warning(f"No candidate nodes found for task {task.id}. Marking as stale.")
                 continue
 
-            # Calculate suitability score for each node
-            def calculate_suitability(node):
-                node_free_cpu = node.free_resources.get('cpu', 0)
-                node_free_ram = node.free_resources.get('ram', 0)
+            if mechanism == "fifo":
+                # Assign nodes just in DB-order (FIFO, no ranking)
+                ranked_nodes = list(candidate_nodes.order_by("last_heartbeat"))
+            else:
+                # Calculate suitability score for each node
+                def calculate_suitability(node):
+                    node_free_cpu = node.free_resources.get('cpu', 0)
+                    node_free_ram = node.free_resources.get('ram', 0)
 
-                task_cpu = task.resource_requirements.get('cpu', 1)
-                task_ram = task.resource_requirements.get('ram', 1)
+                    task_cpu = task.resource_requirements.get('cpu', 1)
+                    task_ram = task.resource_requirements.get('ram', 1)
 
-                cpu_score = abs(node_free_cpu - task_cpu) / max(task_cpu, 1)
-                ram_score = abs(node_free_ram - task_ram) / max(task_ram, 1)
+                    cpu_score = abs(node_free_cpu - task_cpu) / max(task_cpu, 1)
+                    ram_score = abs(node_free_ram - task_ram) / max(task_ram, 1)
 
-                return cpu_score + ram_score  # Lower is better
+                    return cpu_score + ram_score  # Lower is better
 
-            # Rank nodes by suitability and fallback to trust index
-            ranked_nodes = sorted(
-                candidate_nodes,
-                key=lambda node: (calculate_suitability(node), -node.trust_index)
-            )
+                # Rank nodes by suitability and fallback to trust index
+                ranked_nodes = sorted(
+                    candidate_nodes,
+                    key=lambda node: (calculate_suitability(node), -node.trust_index)
+                )
 
             # Assign up to the remaining overlap count
             remaining_assignments = task.overlap_count - len(assigned_nodes)
@@ -238,6 +250,10 @@ class TaskManager:
 
         # Aggregate results from task assignments
         assignments = TaskAssignment.objects.filter(task=task, completed_at__isnull=False)
+        if assignments.count() < task.overlap_count:
+            logger.warning("Not all assignments are completed yet.")
+            return False
+
         result_weights = defaultdict(float)
         node_results = {}
 
@@ -261,7 +277,7 @@ class TaskManager:
         # Determine if the result passes the validation threshold
         validation_threshold = VALIDATION_THRESHOLD  # 60% trust weight threshold
         if max_weight / total_weight >= validation_threshold:
-            task.result = {"validated_output": validated_result, "trust_score": max_weight}
+            task.result = {"validated_output": validated_result, "trust_score": max_weight / total_weight * 10}
             task.status = 'validated'
             task.save()
             logger.info(f"[VALIDATION] Task {task_id} validated successfully with result: {validated_result}")
@@ -283,13 +299,6 @@ class TaskManager:
             task.save()
             logger.warning(f"[VALIDATION] Task {task_id} failed validation. Insufficient trust weight.")
 
-            # Adjust trust indexes negatively for all nodes involved
-            for assignment in assignments:
-                node = assignment.node
-                node.trust_index = max(node.trust_index - TRUST_DECREMENT, TRUST_INDEX_MIN)  # Floor at 1.0
-                node.save()
-                logger.warning(f"[TRUST] Node {node.name} trust index decreased to {node.trust_index}")
-
             return False
 
     def retry_failed_tasks(self):
@@ -309,14 +318,12 @@ class TaskManager:
 
         retried_count = 0
         for task in retryable_tasks:
+            TaskAssignment.objects.filter(task=task).delete()
             task.status = 'pending'
-            task.stale_count = 0  # Reset the stale counter
             task.last_attempted = timezone.now()
             task.save()
             retried_count += 1
-            logger.info(f"[retry_failed_tasks] Task {task.id} reset and moved back to 'pending'.")
-
-        logger.info(f"[retry_failed_tasks] {retried_count} failed tasks were reset for retry.")
+            logger.info(f"[retry_failed_tasks] Task {task.id} reset and moved back to 'pending', assignments cleared.")
 
     def handle_persistently_failing_tasks(self):
         """

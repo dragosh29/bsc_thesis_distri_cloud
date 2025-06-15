@@ -186,11 +186,17 @@ class TaskAssignment(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE)
 
     result = models.JSONField(null=True, blank=True)
-    validated = models.BooleanField(default=False)
 
     assigned_at = models.DateTimeField(auto_now_add=True)
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ('node', 'task')
+
+    @property
+    def validated(self):
+        return self.task.status == 'validated'
 
     def __str__(self):
         return f"TaskAssignment (Task {self.task.id}, Node {self.node.id})"

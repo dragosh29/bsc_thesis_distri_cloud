@@ -13,6 +13,7 @@ class APIClient:
     def register_node(self, node_name):
         if self.node_id:
             print(f"[API CLIENT] Node already registered with ID: {self.node_id}")
+            logging.info(f"Node already registered with ID: {self.node_id}")
             return {"id": self.node_id}
 
         resources = get_node_resources()
@@ -26,7 +27,6 @@ class APIClient:
         headers = {'Content-Type': 'application/json'}
         response = requests.post(f"{self.base_url}/nodes/register/", json=payload, headers=headers)
         response_data = response.json()
-        logging.info(f"Node registration response: {response_data}")
         if 'id' in response_data:
             self.node_id = response_data['id']
             save_node_id(self.node_id)

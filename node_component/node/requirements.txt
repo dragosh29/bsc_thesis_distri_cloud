@@ -2,3 +2,10 @@ requests==2.31.0
 flask
 flask-cors
 psutil
+pytest
+pytest-mock
+pytest-cov
+requests-mock
+flask-testing
+responses
+freezegun
