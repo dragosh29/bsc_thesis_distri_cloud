@@ -5,6 +5,13 @@ interface LoadingButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   children: React.ReactNode;
 }
 
+/**
+ *  LoadingButton component that displays a button with a loading spinner when `isLoading` is true.
+ *  @param {boolean} isLoading - Indicates whether the button is in a loading state.
+ *   @param {React.ReactNode} children - The content to display inside the button.
+ *  @param {React.ButtonHTMLAttributes<HTMLButtonElement>} rest - Additional props for the button.
+ *  @returns {JSX.Element} A button element that shows a spinner when loading.
+*/
 const LoadingButton: React.FC<LoadingButtonProps> = ({ isLoading, children, ...rest }) => {
   return (
     <button

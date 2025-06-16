@@ -12,6 +12,14 @@ interface NodeRuntimeProps {
   onStart: () => void;
 }
 
+/**
+ * NodeRuntime component displays the current status and resource usage of a node.
+ * @param {boolean} props.isRunning - Indicates if the node is currently running.
+ * @param {ResourceUsage} [props.usage] - The resource usage of the node, including CPU and RAM.
+ * @param {boolean} props.isStarting - Indicates if the node is currently starting.
+ * @param {function} props.onStart - Callback function to start the node when it is stopped.
+ * @returns The rendered component.
+ */
 const NodeRuntime: React.FC<NodeRuntimeProps> = ({
   isRunning,
   usage,

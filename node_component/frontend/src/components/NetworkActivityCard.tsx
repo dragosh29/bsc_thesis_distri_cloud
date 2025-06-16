@@ -18,6 +18,11 @@ const defaultData: NetworkActivityData = {
   average_trust_index: 0,
 };
 
+/**
+ * 
+ * @returns  A React component that displays network activity data including active nodes, total CPU, total RAM, and task status summary.
+ * It fetches initial data and subscribes to updates via Server-Sent Events (SSE).
+ */
 const NetworkActivityCard: React.FC = () => {
   const [data, setData] = useState<NetworkActivityData>(defaultData);
   const [isLoading, setIsLoading] = useState(true);

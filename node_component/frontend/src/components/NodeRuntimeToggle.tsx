@@ -11,6 +11,17 @@ interface NodeRuntimeToggleProps {
   onStop: () => void;
 }
 
+/**
+ * NodeRuntimeToggle component displays the current status of a node runtime
+ * and provides buttons to start or stop the node.
+ * @param {boolean} props.isRunning - Indicates if the node is currently running.
+ * @param {ResourceUsage} [props.usage] - The resource usage of the node, including CPU and RAM.
+ * @param {boolean} props.isStarting - Indicates if the node is currently starting.
+ * @param {boolean} props.isStopping - Indicates if the node is currently stopping.
+ * @param {function} props.onStart - Callback function to start the node when it is stopped.
+ * @param {function} props.onStop - Callback function to stop the node when it is running.
+ * @returns The rendered component.
+*/
 const NodeRuntimeToggle: React.FC<NodeRuntimeToggleProps> = ({
   isRunning,
   usage,

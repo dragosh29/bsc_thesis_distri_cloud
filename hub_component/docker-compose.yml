@@ -5,14 +5,14 @@ services:
     restart: always
     environment:
       POSTGRES_DB: distri_cloud
-      POSTGRES_USER: dc_dragos
+      POSTGRES_USER: dc_admin
       POSTGRES_PASSWORD: 123
     ports:
       - "15432:5432"  # External port 15432 maps to internal PostgreSQL port 5432
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dc_dragos -d distri_cloud"]
+      test: ["CMD-SHELL", "pg_isready -U dc_admin -d distri_cloud"]
       interval: 10s
       retries: 5
       timeout: 5s
@@ -31,7 +31,7 @@ services:
       - postgres
     environment:
       - POSTGRES_DB=distri_cloud
-      - POSTGRES_USER=dc_dragos
+      - POSTGRES_USER=dc_admin
       - POSTGRES_PASSWORD=123
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -57,7 +57,7 @@ services:
       - django
     environment:
       - POSTGRES_DB=distri_cloud
-      - POSTGRES_USER=dc_dragos
+      - POSTGRES_USER=dc_admin
       - POSTGRES_PASSWORD=123
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432

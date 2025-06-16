@@ -17,6 +17,12 @@ const SubmittedTasks: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoadingTasks, setIsLoadingTasks] = useState<boolean>(true);
 
+  /**
+    * Loads the submitted tasks for the current node.
+    * If the node ID is not available, it sets an error message.
+    * If fetching tasks fails, it sets an error message.
+    * Otherwise, it updates the tasks state with the fetched tasks.
+  */
   const loadTasks = useCallback(async () => {
     setErrorMessage(null);
     setIsLoadingTasks(true);

@@ -52,6 +52,12 @@ const tooltipStyle: React.CSSProperties = {
   marginTop: '4px',
 };
 
+/**
+ * TaskForm component allows users to submit new tasks.
+ * @param {function} props.onSubmit - Callback function to handle task submission.
+ * @param {boolean} props.isSubmitting - Indicates if the form is currently submitting.
+ * @returns {JSX.Element} The rendered component.
+ */
 const TaskForm: React.FC<TaskFormProps> = ({ onSubmit, isSubmitting }) => {
   const [description, setDescription] = useState('');
   const { nodeConfig, isLoading } = useNodeData();

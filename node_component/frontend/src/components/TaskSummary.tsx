@@ -12,6 +12,16 @@ interface TaskSummaryProps {
   title?: string;
 }
 
+/**
+ * TaskSummary component displays a summary of a task or assignment.
+ * It shows the task description, status, and relevant timestamps.
+ *
+ * @param {Task | TaskAssignment} task - The task or assignment to display.
+ * @param {Record<string, string>} statusColorMap - A mapping of task statuses to colors.
+ * @param {string} [noTaskMessage] - Message to display when no task is provided.
+ * @param {string} [title] - Optional title for the summary card.
+ * @returns {JSX.Element} A styled summary card with task details.
+ */
 const TaskSummary: React.FC<TaskSummaryProps> = ({
   task,
   statusColorMap,

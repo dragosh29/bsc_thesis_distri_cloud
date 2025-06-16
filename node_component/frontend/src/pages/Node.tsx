@@ -30,6 +30,10 @@ const Node: React.FC = () => {
   const getTrustBadgeColor = (value: number): string => trustBadgeColor(value);
   const getTrustTooltip = (value: number): string => trustTooltip(value);
 
+  /**
+    * Safely handles the start node operation with error handling.
+    * If an error occurs, it sets an error message to be displayed.
+  */
   const safeHandleStartNode = async () => {
     try {
       await handleStartNode();
@@ -40,6 +44,10 @@ const Node: React.FC = () => {
     }
   };
 
+  /**
+    * Safely handles the stop node operation with error handling.
+    * If an error occurs, it sets an error message to be displayed.
+  */
   const safeHandleStopNode = async () => {
     try {
       await handleStopNode();
@@ -50,6 +58,12 @@ const Node: React.FC = () => {
     }
   };
 
+  /**
+    * Safely handles the registration of a new node with error handling.
+    * If an error occurs, it sets an error message to be displayed.
+    *
+    * @param {string} name - The name of the node to register.
+  */
   const safeHandleRegisterNode = async (name: string) => {
     try {
       await handleRegisterNode(name);
@@ -88,7 +102,7 @@ const Node: React.FC = () => {
         Node Management
       </h1>
       
-      {isLoading ? (
+      {isLoading && !fullNode ? (
         <LoadingIndicator message="Fetching node info..." />
       ) : nodeConfig?.status === 'registered' && fullNode ? (
         <div

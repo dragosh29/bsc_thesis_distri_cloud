@@ -41,6 +41,12 @@ const buttonStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
+/**
+ * SuccessPopup component displays a success message with optional actions.
+ * @param  {string} message - The success message to display.
+ * @param {function} [onClose] - Optional callback function to execute when the popup is closed.
+ * @returns {JSX.Element} The rendered component.
+ */
 const SuccessPopup: React.FC<SuccessPopupProps> = ({ message, onClose }) => {
   return (
     <div style={overlayStyle}>

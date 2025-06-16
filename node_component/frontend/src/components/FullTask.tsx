@@ -7,6 +7,11 @@ import { getUpdatedTimestampLabel, trustBadgeColor, statusColorMap, translateTas
 import { badgeBaseStyle } from '../styles/shared';
 import Badge from './Badge';
 
+/**
+ * FullTask component to display detailed information about a task.
+ * @param {Task} task - The task object containing all relevant data.
+ * @returns {JSX.Element} The rendered component.
+ */
 const FullTask: React.FC<{ task: Task }> = ({ task }) => {
   const { result } = task;
   const trustScore = result?.trust_score;

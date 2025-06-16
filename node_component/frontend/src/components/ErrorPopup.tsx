@@ -31,6 +31,13 @@ const popupStyle: React.CSSProperties = {
   fontFamily: 'Arial, sans-serif',
 };
 
+/**
+  * ErrorPopup component to display an error message with options to refresh or close.
+  * @param {string} message - The error message to display.
+  * @param {function} [onRefresh] - Optional callback function to execute on refresh.
+  * @param {function} [onClose] - Optional callback function to execute on close.
+  * @returns {JSX.Element} A styled popup with the error message and action buttons.
+  */
 const ErrorPopup: React.FC<ErrorPopupProps> = ({ message, onRefresh, onClose }) => {
   const handleRefresh = () => {
     if (onRefresh) {

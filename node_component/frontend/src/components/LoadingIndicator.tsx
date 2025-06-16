@@ -4,6 +4,11 @@ interface LoadingIndicatorProps {
   message?: string;
 }
 
+/**
+ * LoadingIndicator component to display a loading spinner with a message.
+ * @param {string} [message='Loading...'] - The message to display below the spinner.
+ * @returns {JSX.Element} A styled loading indicator with a spinner and message.
+ */
 const LoadingIndicator: React.FC<LoadingIndicatorProps> = ({ message = 'Loading...' }) => {
   return (
     <div style={{ textAlign: 'center', marginTop: '60px' }}>

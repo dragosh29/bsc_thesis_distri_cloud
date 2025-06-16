@@ -12,6 +12,16 @@ interface Props {
   badgeTooltip: string;
 }
 
+/**
+ * NodeOverview component to display a summary of a network node's status and attributes.
+ * @param {string} name - The name of the node.
+ * @param {string} status - The current status of the node.
+ * @param {string} ipAddress - The IP address of the node.
+ * @param {number} trustIndex - The trust index of the node.
+ * @param {React.CSSProperties} badgeColor - The color of the status badge.
+ * @param {string} badgeTooltip - The tooltip text for the status badge.
+ * @returns {JSX.Element} The rendered component.
+ */
 const NodeOverview: React.FC<Props> = ({
   name,
   status,

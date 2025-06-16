@@ -20,6 +20,13 @@ type Action =
   | { type: 'SET_LAST_TASK'; payload: TaskAssignment }
   | { type: 'SET_FULL_NODE'; payload: FullNode };
 
+  /*
+    * Reducer function to manage the state of node data.
+    * Handles actions to set node configuration, last task details, and full node data.
+    * @param {State} state - The current state of the node data.
+    * @param {Action} action - The action to perform on the state.
+    * @returns {State} The new state after applying the action.
+  */ 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'SET_NODE_CONFIG': {
@@ -75,6 +82,12 @@ function reducer(state: State, action: Action): State {
   }
 }
 
+/**
+ * Custom hook to manage node data and operations.
+ * 
+ * @returns  {Object} An object containing node configuration, full node data, loading states, and handlers for node operations.
+ * @property {NodeConfig | null} nodeConfig - The current node configuration.
+ */
 export function useNodeData() {
   const [state, dispatch] = useReducer(reducer, {
     nodeConfig: null,
@@ -95,6 +108,10 @@ export function useNodeData() {
     dispatch({ type: 'SET_LAST_TASK', payload: task });
   };
 
+  /**
+   * Fetches the current node status, including configuration and full node details.
+   * Updates the state with the fetched data.
+   */
   const fetchNodeStatus = async () => {
     try {
       setIsLoading(true);
@@ -114,6 +131,12 @@ export function useNodeData() {
     }
   };
 
+  /**
+   * Handles the registration of a new node with the given name.
+   * Updates the node status after registration.
+   * 
+   * @param {string} name - The name of the node to register.
+   */
   const handleRegisterNode = async (name: string) => {
     setIsRegistering(true);
     await registerNode(name);
@@ -121,6 +144,10 @@ export function useNodeData() {
     setIsRegistering(false);
   };
 
+  /**
+   * Handles the start operation for the node.
+   * Updates the node status after starting.
+   */
   const handleStartNode = async () => {
     setIsStarting(true);
     await startNode();
@@ -128,6 +155,10 @@ export function useNodeData() {
     setIsStarting(false);
   };
 
+  /**
+   * Handles the stop operation for the node.
+   * Updates the node status after stopping.
+   */
   const handleStopNode = async () => {
     setIsStopping(true);
     await stopNode();

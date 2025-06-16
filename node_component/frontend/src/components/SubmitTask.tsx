@@ -6,6 +6,10 @@ import SuccessPopup from '../components/SuccessPopup';
 import { submitTask } from '../services/api';
 import { Link } from 'react-router-dom';
 
+/**
+ * SubmitTask component allows users to submit new tasks.
+ * @returns  {JSX.Element} A component for submitting new tasks.
+ */
 const SubmitTask: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
